@@ -52,7 +52,16 @@ if menu == "📊 Dashboard":
     data = pd.DataFrame(raw_data)
     
     if not data.empty:
-        data.fillna(0, inplace=True)
+        if not data.empty:
+    # Sabse pehle column names ko clean karein agar zarurat ho
+    data.columns = [c.strip() for c in data.columns]
+    
+    # Numeric columns ko identify karein aur sirf unme 0 bharein
+    numeric_cols = data.select_dtypes(include=['number']).columns
+    data[numeric_cols] = data[numeric_cols].fillna(0)
+    
+    # Baaki columns (Text) mein empty string bharein 0 ki jagah
+    data = data.fillna("")
         
         # Original Logic Calculations
         total_proj = data['Project Amount'].astype(float).sum()
