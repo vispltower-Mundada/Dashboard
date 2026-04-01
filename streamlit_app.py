@@ -94,95 +94,90 @@ if menu == "📊 Dashboard":
     else:
         st.info("No data found in the database.")
 
-# ================= 📁 PROJECT MANAGEMENT (FULL PROFESSIONAL PORTAL) =================
+# ================= 📁 PROJECT MANAGEMENT (ACTIONS INSIDE TABLE) =================
 elif menu == "📁 Project Management":
     st.title("📁 Project Management Portal")
 
-    # --- 1. POP-UP MODALS (ST.DIALOG) ---
+    # --- 1. HANDLE CLICKS FROM TABLE ---
+    # Jab aap ✏️ ya 🗑️ par click karenge, URL change hoga aur hum use yahan pakdenge
+    q_params = st.query_params
     
+    # Check if Delete was clicked
+    if "del_id" in q_params:
+        delete_row("indus_data", int(q_params["del_id"]))
+        st.query_params.clear()
+        st.rerun()
+
+    # --- 2. POP-UPS (ST.DIALOG) ---
     @st.dialog("📝 Edit Site Details", width="large")
     def edit_modal(row_data):
-        st.write(f"Editing: **{row_data.get('Project ID', 'N/A')}**")
-        with st.form("edit_form_popup", clear_on_submit=True):
-            c1, c2, c3 = st.columns(3)
-            # Pre-filled values from row_data
-            p_name = c1.text_input("Project Name", value=row_data.get('Project', ''))
+        with st.form("edit_form_popup"):
+            st.write(f"Editing: **{row_data.get('Project ID')}**")
+            c1, c2 = st.columns(2)
+            p_name = c1.text_input("Project", value=row_data.get('Project', ''))
             s_name = c2.text_input("Site Name", value=row_data.get('Site Name', ''))
-            t_name = c3.selectbox("Team Name", ["Team A", "Team B", "Team C", "Team D"], 
-                                  index=0) # Indexing logic can be added here
-            
-            p_amt = c1.number_input("Projected Amount", value=float(row_data.get('Projected Amount', 0)))
-            t_bill = c2.number_input("Team Billing", value=float(row_data.get('Team Billing', 0)))
-            t_paid = c3.number_input("Team Paid Amount", value=float(row_data.get('Team paid Amount', 0)))
-            
-            v_inv = c1.text_input("VIS Invoice No.", value=row_data.get('VIS Invoice No.', ''))
+            t_bill = c1.number_input("Team Billing", value=float(row_data.get('Team Billing', 0)))
             v_amt = c2.number_input("VIS Bill Amount", value=float(row_data.get('VIS Bill Amount', 0)))
-            v_rec = c3.number_input("VIS Received Amt", value=float(row_data.get('VIS Received Amt', 0)))
 
-            if st.form_submit_button("✅ Update & Save Changes"):
+            if st.form_submit_button("✅ Update"):
                 updated_payload = {
-                    "Project": p_name, "Site Name": s_name, "Team Name": t_name,
-                    "Projected Amount": p_amt, "Team Billing": t_bill, "Team paid Amount": t_paid,
-                    "Team Balance": t_bill - t_paid, "VIS Invoice No.": v_inv,
-                    "VIS Bill Amount": v_amt, "VIS Received Amt": v_rec,
-                    "VIS Balance": v_amt - v_rec, "Profit": v_amt - t_bill
+                    "Project": p_name, "Site Name": s_name, 
+                    "Team Billing": t_bill, "VIS Bill Amount": v_amt,
+                    "Team Balance": t_bill - float(row_data.get('Team paid Amount', 0)),
+                    "Profit": v_amt - t_bill
                 }
                 update_row("indus_data", row_data['id'], updated_payload)
-                st.success("Entry Updated Successfully!")
                 st.rerun()
 
-    @st.dialog("🗑️ Confirm Deletion")
-    def delete_modal(row_id, p_id):
-        st.error(f"Are you sure you want to delete Project ID: **{p_id}**?")
-        st.write("This action is permanent and cannot be undone.")
-        col1, col2 = st.columns(2)
-        if col1.button("Yes, Delete", use_container_width=True):
-            delete_row("indus_data", row_id)
-            st.rerun()
-        if col2.button("Cancel", use_container_width=True):
-            st.rerun()
+    # Edit trigger check from URL
+    if "edit_id" in q_params:
+        target_id = int(q_params["edit_id"])
+        # Find row and open modal
+        raw_rows = fetch_table("indus_data")
+        for r in raw_rows:
+            if r['id'] == target_id:
+                st.query_params.clear()
+                edit_modal(r)
+                break
 
-    # --- 2. TOP TOOLBAR ---
+    # --- 3. TOOLBAR ---
     t1, t2, t3, t4 = st.columns([1, 1.2, 1, 3])
     with t1:
         if st.button("➕ Add New Site", use_container_width=True, type="primary"):
             st.session_state.show_form = not st.session_state.get('show_form', False)
 
     df_m = pd.DataFrame(fetch_table("indus_data"))
-    
-    with t3:
-        if not df_m.empty:
-            out = BytesIO()
-            with pd.ExcelWriter(out, engine='xlsxwriter') as wr:
-                df_m.to_excel(wr, index=False)
-            st.download_button("📥 Download Excel", out.getvalue(), "Vision_Master.xlsx", use_container_width=True)
-    
     with t4:
-        search = st.text_input("", placeholder="🔍 Search ID, Site, Team or Status...", label_visibility="collapsed")
+        search = st.text_input("", placeholder="🔍 Search...", label_visibility="collapsed")
 
-    # --- 3. THE DATA TABLE WITH SCROLLER ---
+    # --- 4. DATA TABLE WITH EMBEDDED BUTTONS ---
     if not df_m.empty:
-        # Search Filter
         df_f = df_m[df_m.astype(str).apply(lambda x: x.str.contains(search, case=False)).any(axis=1)] if search else df_m
         
-        # Pagination
         pg_size = 5
         tot_pgs = max(1, (len(df_f) // pg_size) + (1 if len(df_f) % pg_size > 0 else 0))
         curr_pg = st.number_input("Page", 1, tot_pgs, 1)
 
-        # Helper function for Currency/Nan Fix
         def clean_val(val):
-            try:
-                v = float(val)
-                return 0.0 if pd.isna(v) else v
-            except:
-                return 0.0
+            try: v = float(val); return 0.0 if pd.isna(v) else v
+            except: return 0.0
 
-        # Build HTML Table Rows
+        # Build HTML Table Rows with Action Icons
         table_rows = ""
         for _, row in df_f.iloc[(curr_pg-1)*pg_size : curr_pg*pg_size].iterrows():
+            rid = row.get('id')
+            
+            # Icons as links that send Query Params to URL
+            # target="_self" ensures it opens in the same tab
+            actions_html = f"""
+                <a href="?edit_id={rid}" target="_self" style="text-decoration:none; font-size:16px;">✏️</a> &nbsp;
+                <a href="?pay_id={row.get('Project ID')}" target="_self" style="text-decoration:none; font-size:16px;">💰</a> &nbsp;
+                <a href="?del_id={rid}" target="_self" style="text-decoration:none; font-size:16px; color:red;">🗑️</a>
+            """
+
             table_rows += f"""
             <tr>
+                <td style="min-width:100px; text-align:center;">{actions_html}</td>
                 <td><b>{row.get('Project ID','-')}</b></td>
                 <td>{row.get('Project','-')}</td>
                 <td>{row.get('Site ID','-')}</td>
@@ -218,6 +213,7 @@ elif menu == "📁 Project Management":
             <div class="container">
                 <table>
                     <tr>
+                        <th style="text-align:center;">Actions</th>
                         <th>Project ID</th><th>Project</th><th>Site ID</th><th>Site Name</th>
                         <th>Cluster</th><th>PO Number</th><th>Projected Amt</th><th>Team Name</th>
                         <th>Status</th><th>Team Billing</th><th>Team Paid</th><th>Team Bal</th>
@@ -229,30 +225,11 @@ elif menu == "📁 Project Management":
         </body>
         </html>
         """
+        
         import streamlit.components.v1 as components
-        components.html(full_html, height=350, scrolling=True)
-
-        # --- 4. ACTION BUTTONS (BELOW TABLE) ---
-        st.write("### ⚙️ Line Actions")
-        # Creating columns for each action button per visible row
-        for i, row in df_f.iloc[(curr_pg-1)*pg_size : curr_pg*pg_size].iterrows():
-            rid = row.get('id', i)
-            p_id = row.get('Project ID', 'N/A')
-            
-            c_act = st.columns([0.5, 0.5, 0.5, 8])
-            if c_act[0].button("✏️", key=f"edit_{rid}"):
-                edit_modal(row)
-            
-            if c_act[1].button("💰", key=f"pay_{rid}"):
-                st.toast(f"Finance Link for {p_id} coming soon!")
-                
-            if c_act[2].button("🗑️", key=f"del_{rid}"):
-                delete_modal(row['id'], p_id)
-            
-            c_act[3].write(f"Actions for ID: **{p_id}** | Site: {row.get('Site Name','-')}")
-            st.divider()
+        components.html(full_html, height=400, scrolling=True)
     else:
-        st.info("No data available.")
+        st.info("No data found.")
 # ================= 💰 FINANCE (UNCHANGED) =================
 elif menu == "💰 Finance":
     st.title("💰 Finance Entry")
