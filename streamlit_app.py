@@ -94,7 +94,7 @@ if menu == "📊 Dashboard":
     else:
         st.info("No data found in the database.")
 
-# ================= 📁 PROJECT MANAGEMENT (UNIFIED TABLE) =================
+# ================= 📁 PROJECT MANAGEMENT (UNIFIED TABLE & SINGLE SCROLLER) =================
 elif menu == "📁 Project Management":
     st.title("📁 Project Master List")
 
@@ -147,69 +147,90 @@ elif menu == "📁 Project Management":
         search = t4.text_input("", placeholder="🔍 Search...", label_visibility="collapsed")
         df_f = df_m[df_m.astype(str).apply(lambda x: x.str.contains(search, case=False)).any(axis=1)] if search else df_m
         
-        # Table Styling
+        # Pagination
+        pg_size = 10 # Adjusted to see more in unified table
+        tot_pgs = max(1, (len(df_f) // pg_size) + (1 if len(df_f) % pg_size > 0 else 0))
+        curr_pg = st.number_input("Page", 1, tot_pgs, 1)
+
+        # --- ACTION HANDLER ---
+        # Query params logic to trigger dialogs from HTML buttons
+        params = st.query_params
+        if "edit_id" in params:
+            rid = int(params["edit_id"])
+            target_row = df_m[df_m['id'] == rid].iloc[0]
+            st.query_params.clear()
+            edit_modal(target_row)
+        
+        if "del_id" in params:
+            rid = int(params["del_id"])
+            p_id = params.get("p_id", "Record")
+            st.query_params.clear()
+            delete_modal(rid, p_id)
+
+        # --- TABLE CSS & HTML CONSTRUCTION ---
         st.markdown("""
             <style>
-            .unified-wrapper { width: 100%; overflow-x: auto; border: 1px solid #ddd; border-radius: 8px; }
-            .vision-table { width: 100%; border-collapse: collapse; min-width: 2800px; }
-            .vision-table th { background-color: #1E60D5; color: white; padding: 12px; text-align: left; position: sticky; top: 0; }
+            .unified-table-container { width: 100%; overflow-x: auto; border: 1px solid #ddd; border-radius: 8px; }
+            .vision-table { width: 100%; border-collapse: collapse; min-width: 2800px; font-family: sans-serif; }
+            .vision-table th { background-color: #1E60D5; color: white; padding: 12px; text-align: left; position: sticky; top: 0; z-index: 2; }
             .vision-table td { padding: 10px; border-bottom: 1px solid #eee; font-size: 13px; background: white; }
-            .action-col { width: 120px; text-align: center; background: #f8f9fa !important; position: sticky; left: 0; z-index: 5; border-right: 2px solid #ddd !important; }
+            .vision-table tr:hover { background-color: #f1f5f9; }
+            .action-btn { text-decoration: none; font-size: 16px; margin: 0 5px; }
             </style>
         """, unsafe_allow_html=True)
 
-        # Pagination
-        pg_size = 5
-        tot_pgs = max(1, (len(df_f) // pg_size) + (1 if len(df_f) % pg_size > 0 else 0))
-        curr_pg = st.number_input("Page", 1, tot_pgs, 1)
-        
-        st.write("---")
-        
-        # --- START UNIFIED TABLE CONSTRUCTION ---
         def fmt(v): 
             try: return f"₹{float(v):,.2f}" if not pd.isna(v) else "₹0.00"
             except: return "₹0.00"
 
-        # We must use Streamlit columns for the buttons to work, 
-        # but we'll align them to look like they are part of the table.
+        # Build Table Header
+        table_html = """
+        <div class="unified-table-container">
+            <table class="vision-table">
+                <tr>
+                    <th style="width:100px; position:sticky; left:0; background:#1E60D5; z-index:3;">Actions</th>
+                    <th style="width:200px">Project ID</th>
+                    <th>Project</th><th>Site ID</th><th>Site Name</th><th>Cluster</th><th>PO Number</th>
+                    <th>Projected Amt</th><th>Status</th><th>Team Billing</th><th>Team Paid</th>
+                    <th>Team Balance</th><th>VIS Inv No</th><th>VIS Bill Amt</th><th>VIS Rec Amt</th><th>VIS Balance</th>
+                </tr>
+        """
+
+        # Build Table Body
         for i, row in df_f.iloc[(curr_pg-1)*pg_size : curr_pg*pg_size].iterrows():
             db_id = row.get('id') if row.get('id') else row.get('ID', i)
             p_id = row.get('Project ID', 'N/A')
-
-            # Row Layout: Buttons (left) + Data (right)
-            # This ensures teeno buttons starting mein hi rahein
-            btn1, btn2, btn3, data_area = st.columns([0.4, 0.4, 0.4, 10])
             
-            if btn1.button("✏️", key=f"e_{db_id}_{i}"): edit_modal(row)
-            if btn2.button("💰", key=f"p_{db_id}_{i}"): st.toast(f"Finance for {p_id}")
-            if btn3.button("🗑️", key=f"d_{db_id}_{i}"): delete_modal(db_id, p_id)
-            
-            # The Data part for this specific row in a scrollable div
-            row_html = f"""
-            <div class="unified-wrapper">
-                <table class="vision-table">
-                    <tr>
-                        <td style="width:200px"><b>{p_id}</b></td>
-                        <td style="width:150px">{row.get('Project','-')}</td>
-                        <td style="width:150px">{row.get('Site ID','-')}</td>
-                        <td style="width:200px">{row.get('Site Name','-')}</td>
-                        <td style="width:150px">{row.get('Cluster','-')}</td>
-                        <td style="width:150px">{row.get('PO Number','-')}</td>
-                        <td style="width:150px">{fmt(row.get('Projected Amount'))}</td>
-                        <td style="width:120px">{row.get('Site Status','-')}</td>
-                        <td style="width:150px">{fmt(row.get('Team Billing'))}</td>
-                        <td style="width:150px">{fmt(row.get('Team paid Amount'))}</td>
-                        <td style="width:150px; color:red; font-weight:bold;">{fmt(row.get('Team Balance'))}</td>
-                        <td style="width:150px">{row.get('VIS Invoice No.','-')}</td>
-                        <td style="width:150px">{fmt(row.get('VIS Bill Amount'))}</td>
-                        <td style="width:150px">{fmt(row.get('VIS Received Amt'))}</td>
-                        <td style="width:150px; color:orange; font-weight:bold;">{fmt(row.get('VIS Balance'))}</td>
-                    </tr>
-                </table>
-            </div>
+            table_html += f"""
+                <tr>
+                    <td style="position:sticky; left:0; background:white; z-index:1; border-right:1px solid #ddd; text-align:center;">
+                        <a href="?edit_id={db_id}" target="_self" class="action-btn">✏️</a>
+                        <a href="?pay_id={p_id}" target="_self" class="action-btn">💰</a>
+                        <a href="?del_id={db_id}&p_id={p_id}" target="_self" class="action-btn">🗑️</a>
+                    </td>
+                    <td><b>{p_id}</b></td>
+                    <td>{row.get('Project','-')}</td>
+                    <td>{row.get('Site ID','-')}</td>
+                    <td>{row.get('Site Name','-')}</td>
+                    <td>{row.get('Cluster','-')}</td>
+                    <td>{row.get('PO Number','-')}</td>
+                    <td>{fmt(row.get('Projected Amount'))}</td>
+                    <td>{row.get('Site Status','-')}</td>
+                    <td>{fmt(row.get('Team Billing'))}</td>
+                    <td>{fmt(row.get('Team paid Amount'))}</td>
+                    <td style="color:red; font-weight:bold;">{fmt(row.get('Team Balance'))}</td>
+                    <td>{row.get('VIS Invoice No.','-')}</td>
+                    <td>{fmt(row.get('VIS Bill Amount'))}</td>
+                    <td>{fmt(row.get('VIS Received Amt'))}</td>
+                    <td style="color:orange; font-weight:bold;">{fmt(row.get('VIS Balance'))}</td>
+                </tr>
             """
-            data_area.markdown(row_html, unsafe_allow_html=True)
-            st.write("") # Minimal spacing
+        
+        table_html += "</table></div>"
+        
+        # Render Unified Table
+        import streamlit.components.v1 as components
+        components.html(table_html, height=500, scrolling=True)
 
     else:
         st.info("No data found.")
