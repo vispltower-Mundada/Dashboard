@@ -94,53 +94,43 @@ if menu == "📊 Dashboard":
     else:
         st.info("No data found in the database.")
 
-# ================= 📁 PROJECT MANAGEMENT (ACTIONS INSIDE TABLE) =================
+# ================= 📁 PROJECT MANAGEMENT (FIXED POP-UP & LAYOUT) =================
 elif menu == "📁 Project Management":
     st.title("📁 Project Management Portal")
 
-    # --- 1. HANDLE CLICKS FROM TABLE ---
-    # Jab aap ✏️ ya 🗑️ par click karenge, URL change hoga aur hum use yahan pakdenge
-    q_params = st.query_params
-    
-    # Check if Delete was clicked
-    if "del_id" in q_params:
-        delete_row("indus_data", int(q_params["del_id"]))
-        st.query_params.clear()
-        st.rerun()
-
-    # --- 2. POP-UPS (ST.DIALOG) ---
+    # --- 1. POP-UP DIALOGS ---
     @st.dialog("📝 Edit Site Details", width="large")
     def edit_modal(row_data):
-        with st.form("edit_form_popup"):
-            st.write(f"Editing: **{row_data.get('Project ID')}**")
-            c1, c2 = st.columns(2)
+        st.write(f"Editing Project ID: **{row_data['Project ID']}**")
+        with st.form("edit_site_form"):
+            c1, c2, c3 = st.columns(3)
             p_name = c1.text_input("Project", value=row_data.get('Project', ''))
             s_name = c2.text_input("Site Name", value=row_data.get('Site Name', ''))
+            t_name = c3.selectbox("Team", ["Team A", "Team B", "Team C", "Team D"], index=0)
+            
             t_bill = c1.number_input("Team Billing", value=float(row_data.get('Team Billing', 0)))
-            v_amt = c2.number_input("VIS Bill Amount", value=float(row_data.get('VIS Bill Amount', 0)))
-
-            if st.form_submit_button("✅ Update"):
-                updated_payload = {
-                    "Project": p_name, "Site Name": s_name, 
-                    "Team Billing": t_bill, "VIS Bill Amount": v_amt,
-                    "Team Balance": t_bill - float(row_data.get('Team paid Amount', 0)),
+            t_paid = c2.number_input("Team Paid Amount", value=float(row_data.get('Team paid Amount', 0)))
+            v_amt = c3.number_input("VIS Bill Amount", value=float(row_data.get('VIS Bill Amount', 0)))
+            
+            if st.form_submit_button("✅ Save Changes"):
+                payload = {
+                    "Project": p_name, "Site Name": s_name, "Team Name": t_name,
+                    "Team Billing": t_bill, "Team paid Amount": t_paid,
+                    "Team Balance": t_bill - t_paid, "VIS Bill Amount": v_amt,
                     "Profit": v_amt - t_bill
                 }
-                update_row("indus_data", row_data['id'], updated_payload)
+                update_row("indus_data", row_data['id'], payload)
+                st.success("Updated!")
                 st.rerun()
 
-    # Edit trigger check from URL
-    if "edit_id" in q_params:
-        target_id = int(q_params["edit_id"])
-        # Find row and open modal
-        raw_rows = fetch_table("indus_data")
-        for r in raw_rows:
-            if r['id'] == target_id:
-                st.query_params.clear()
-                edit_modal(r)
-                break
+    @st.dialog("🗑️ Confirm Delete")
+    def delete_modal(row_id, p_id):
+        st.warning(f"Are you sure you want to delete **{p_id}**?")
+        if st.button("❌ Yes, Delete Permanently", use_container_width=True):
+            delete_row("indus_data", row_id)
+            st.rerun()
 
-    # --- 3. TOOLBAR ---
+    # --- 2. TOOLBAR ---
     t1, t2, t3, t4 = st.columns([1, 1.2, 1, 3])
     with t1:
         if st.button("➕ Add New Site", use_container_width=True, type="primary"):
@@ -150,7 +140,7 @@ elif menu == "📁 Project Management":
     with t4:
         search = st.text_input("", placeholder="🔍 Search...", label_visibility="collapsed")
 
-    # --- 4. DATA TABLE WITH EMBEDDED BUTTONS ---
+    # --- 3. DATA TABLE (LAVISH FORMAT) ---
     if not df_m.empty:
         df_f = df_m[df_m.astype(str).apply(lambda x: x.str.contains(search, case=False)).any(axis=1)] if search else df_m
         
@@ -158,78 +148,72 @@ elif menu == "📁 Project Management":
         tot_pgs = max(1, (len(df_f) // pg_size) + (1 if len(df_f) % pg_size > 0 else 0))
         curr_pg = st.number_input("Page", 1, tot_pgs, 1)
 
-        def clean_val(val):
-            try: v = float(val); return 0.0 if pd.isna(v) else v
-            except: return 0.0
+        # CSS for Horizontal Scroll
+        st.markdown("""
+            <style>
+            .scroll-view { width: 100%; overflow-x: auto; border: 1px solid #eee; border-radius: 10px; }
+            .vision-table { width: 100%; border-collapse: collapse; min-width: 2500px; }
+            .vision-table th { background-color: #1E60D5; color: white; padding: 12px; text-align: left; }
+            .vision-table td { padding: 12px; border-bottom: 1px solid #f0f0f0; font-size: 13px; background: white; }
+            </style>
+        """, unsafe_allow_html=True)
 
-        # Build HTML Table Rows with Action Icons
-        table_rows = ""
-        for _, row in df_f.iloc[(curr_pg-1)*pg_size : curr_pg*pg_size].iterrows():
-            rid = row.get('id')
+        st.write("### 📋 Site Records")
+        
+        # We loop through data and create one row for buttons + one row for table data
+        for i, row in df_f.iloc[(curr_pg-1)*pg_size : curr_pg*pg_size].iterrows():
+            # Action Buttons Row
+            b1, b2, b3, info = st.columns([0.4, 0.4, 0.4, 8])
             
-            # Icons as links that send Query Params to URL
-            # target="_self" ensures it opens in the same tab
-            actions_html = f"""
-                <a href="?edit_id={rid}" target="_self" style="text-decoration:none; font-size:16px;">✏️</a> &nbsp;
-                <a href="?pay_id={row.get('Project ID')}" target="_self" style="text-decoration:none; font-size:16px;">💰</a> &nbsp;
-                <a href="?del_id={rid}" target="_self" style="text-decoration:none; font-size:16px; color:red;">🗑️</a>
-            """
+            if b1.button("✏️", key=f"ed_{row['id']}"):
+                edit_modal(row)
+            
+            if b2.button("💰", key=f"py_{row['id']}"):
+                st.toast("Finance Module connection pending...")
+            
+            if b3.button("🗑️", key=f"dl_{row['id']}"):
+                delete_modal(row['id'], row['Project ID'])
+            
+            # This makes the data look like it's part of the row
+            info.markdown(f"**ID:** `{row['Project ID']}` | **Site:** {row['Site Name']} | **Team:** {row['Team Name']}")
 
-            table_rows += f"""
-            <tr>
-                <td style="min-width:100px; text-align:center;">{actions_html}</td>
-                <td><b>{row.get('Project ID','-')}</b></td>
-                <td>{row.get('Project','-')}</td>
-                <td>{row.get('Site ID','-')}</td>
-                <td>{row.get('Site Name','-')}</td>
-                <td>{row.get('Cluster','-')}</td>
-                <td>{row.get('PO Number','-')}</td>
-                <td>₹{clean_val(row.get('Projected Amount')):,.2f}</td>
-                <td>{row.get('Team Name','-')}</td>
-                <td>{row.get('Site Status','-')}</td>
-                <td>₹{clean_val(row.get('Team Billing')):,.2f}</td>
-                <td>₹{clean_val(row.get('Team paid Amount')):,.2f}</td>
-                <td style="color:red; font-weight:bold;">₹{clean_val(row.get('Team Balance')):,.2f}</td>
-                <td>{row.get('VIS Invoice No.','-')}</td>
-                <td>{row.get('VIS Invoice Date','-')}</td>
-                <td>₹{clean_val(row.get('VIS Bill Amount')):,.2f}</td>
-                <td>₹{clean_val(row.get('VIS Received Amt')):,.2f}</td>
-                <td style="color:orange; font-weight:bold;">₹{clean_val(row.get('VIS Balance')):,.2f}</td>
-            </tr>
-            """
+            # Horizontal Scrollable Data Part
+            def clean(v): 
+                try: return f"₹{float(v):,.2f}"
+                except: return "₹0.00"
 
-        full_html = f"""
-        <html>
-        <head>
-        <style>
-            .container {{ width: 100%; overflow-x: auto; font-family: sans-serif; }}
-            table {{ width: 100%; border-collapse: collapse; min-width: 2800px; border: 1px solid #ddd; }}
-            th {{ background-color: #1E60D5; color: white; padding: 12px; text-align: left; position: sticky; top: 0; }}
-            td {{ padding: 12px; border-bottom: 1px solid #eee; font-size: 13px; background: white; }}
-            tr:hover {{ background-color: #f1f5f9; }}
-        </style>
-        </head>
-        <body>
-            <div class="container">
-                <table>
+            table_html = f"""
+            <div class="scroll-view">
+                <table class="vision-table">
                     <tr>
-                        <th style="text-align:center;">Actions</th>
-                        <th>Project ID</th><th>Project</th><th>Site ID</th><th>Site Name</th>
-                        <th>Cluster</th><th>PO Number</th><th>Projected Amt</th><th>Team Name</th>
-                        <th>Status</th><th>Team Billing</th><th>Team Paid</th><th>Team Bal</th>
-                        <th>VIS Inv No</th><th>VIS Inv Date</th><th>VIS Bill Amt</th><th>VIS Rec Amt</th><th>VIS Balance</th>
+                        <th>Project</th><th>Site ID</th><th>Cluster</th><th>PO Number</th>
+                        <th>Projected Amt</th><th>Status</th><th>Team Billing</th>
+                        <th>Team Paid</th><th>Team Balance</th><th>VIS Inv No</th>
+                        <th>VIS Bill Amt</th><th>VIS Rec Amt</th><th>VIS Balance</th>
                     </tr>
-                    {table_rows}
+                    <tr>
+                        <td>{row.get('Project','-')}</td>
+                        <td>{row.get('Site ID','-')}</td>
+                        <td>{row.get('Cluster','-')}</td>
+                        <td>{row.get('PO Number','-')}</td>
+                        <td>{clean(row.get('Projected Amount'))}</td>
+                        <td>{row.get('Site Status','-')}</td>
+                        <td>{clean(row.get('Team Billing'))}</td>
+                        <td>{clean(row.get('Team paid Amount'))}</td>
+                        <td style="color:red; font-weight:bold;">{clean(row.get('Team Balance'))}</td>
+                        <td>{row.get('VIS Invoice No.','-')}</td>
+                        <td>{clean(row.get('VIS Bill Amount'))}</td>
+                        <td>{clean(row.get('VIS Received Amt'))}</td>
+                        <td style="color:orange; font-weight:bold;">{clean(row.get('VIS Balance'))}</td>
+                    </tr>
                 </table>
             </div>
-        </body>
-        </html>
-        """
-        
-        import streamlit.components.v1 as components
-        components.html(full_html, height=400, scrolling=True)
+            """
+            st.markdown(table_html, unsafe_allow_html=True)
+            st.write("") # Spacer between rows
+            
     else:
-        st.info("No data found.")
+        st.info("No projects found.")
 # ================= 💰 FINANCE (UNCHANGED) =================
 elif menu == "💰 Finance":
     st.title("💰 Finance Entry")
