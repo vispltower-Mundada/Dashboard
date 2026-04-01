@@ -245,9 +245,12 @@ elif menu == "📁 Project Management":
         .data-table th { background: #1E60D5; color: white; padding: 12px; text-align: left; position: sticky; top: 0; z-index: 2; font-size: 14px; }
         .data-table td { padding: 12px; border-bottom: 1px solid #eee; font-size: 13px; color: #333; }
         .data-table tr:hover { background: #f8f9fa; }
-        .sticky-action { position: sticky; left: 0; background: #f4f6f9 !important; z-index: 1; border-right: 2px solid #ddd !important; text-align: center; }
-        .sticky-action-header { position: sticky; left: 0; z-index: 3 !important; background: #1E60D5 !important; border-right: 2px solid #144ba6 !important; text-align: center; }
-        .btn-icon { text-decoration: none; font-size: 16px; margin: 0 6px; }
+        
+        /* FIX: Z-index badhaya gaya hai taaki buttons click ho sakein */
+        .sticky-action { position: sticky; left: 0; background: #f4f6f9 !important; z-index: 99 !important; border-right: 2px solid #ddd !important; text-align: center; }
+        .sticky-action-header { position: sticky; left: 0; z-index: 100 !important; background: #1E60D5 !important; border-right: 2px solid #144ba6 !important; text-align: center; }
+        .btn-icon { text-decoration: none; font-size: 18px; margin: 0 8px; cursor: pointer; display: inline-block; position: relative; z-index: 101; }
+        
         .status-badge { background: #e3f2fd; color: #1e88e5; padding: 4px 8px; border-radius: 12px; font-weight: bold; font-size: 11px; }
         </style>
         <div class="scroll-container">
