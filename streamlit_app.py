@@ -94,11 +94,11 @@ if menu == "📊 Dashboard":
     else:
         st.info("No data found in the database.")
 
-# ================= 📁 PROJECT MANAGEMENT (LAVISH UNIFIED TABLE) =================
+# ================= 📁 PROJECT MANAGEMENT (STRICT UNIFIED SCROLLER) =================
 elif menu == "📁 Project Management":
     st.title("📁 Project Master List")
 
-    # --- 1. POP-UP DIALOGS (Modals) ---
+    # --- 1. POP-UP DIALOGS ---
     @st.dialog("📝 Edit Site Details", width="large")
     def edit_modal(row_data):
         st.write(f"Editing Project ID: **{row_data.get('Project ID', 'N/A')}**")
@@ -144,7 +144,7 @@ elif menu == "📁 Project Management":
 
     if not df_m.empty:
         # Search & Filter
-        search = t4.text_input("", placeholder="🔍 Search Site, ID, or Status...", label_visibility="collapsed")
+        search = t4.text_input("", placeholder="🔍 Search...", label_visibility="collapsed")
         df_f = df_m[df_m.astype(str).apply(lambda x: x.str.contains(search, case=False)).any(axis=1)] if search else df_m
         
         # Pagination
@@ -166,99 +166,72 @@ elif menu == "📁 Project Management":
             st.query_params.clear()
             delete_modal(rid, p_id)
 
-        # --- CSS FOR REAL SCROLLER & LAVISH LOOK ---
+        # --- CSS FOR LAVISH LOOK & SINGLE SCROLLER ---
         st.markdown("""
             <style>
-            .main-wrapper {
+            .table-outer-wrapper {
                 width: 100%;
                 overflow-x: auto; /* ENABLE HORIZONTAL SCROLL */
-                border-radius: 12px;
-                box-shadow: 0 5px 15px rgba(0,0,0,0.08);
                 background: white;
-                margin-top: 10px;
+                border-radius: 10px;
+                border: 1px solid #ddd;
+                box-shadow: 0 4px 10px rgba(0,0,0,0.05);
             }
             .vision-table {
                 width: 100%;
                 border-collapse: collapse;
-                min-width: 3200px; /* FORCE WIDTH FOR SCROLL */
-                font-family: 'Inter', sans-serif;
+                min-width: 3000px; /* FORCE SCROLLBAR */
+                font-family: sans-serif;
             }
             .vision-table th {
-                background: #1E60D5;
+                background-color: #1E60D5;
                 color: white;
                 padding: 15px;
                 text-align: left;
-                font-size: 13px;
-                text-transform: uppercase;
                 position: sticky;
                 top: 0;
-                z-index: 10;
+                z-index: 2;
             }
             .vision-table td {
                 padding: 12px 15px;
-                border-bottom: 1px solid #f2f2f2;
+                border-bottom: 1px solid #eee;
                 font-size: 13px;
-                color: #333;
+                background: white;
             }
-            .sticky-action {
+            .vision-table tr:hover { background-color: #f8f9fa; }
+            .sticky-col {
                 position: sticky;
                 left: 0;
                 background: white !important;
-                z-index: 5;
+                z-index: 1;
                 border-right: 2px solid #eee !important;
                 text-align: center;
                 min-width: 120px;
             }
-            .sticky-header-action {
+            .sticky-header {
                 left: 0 !important;
-                z-index: 11 !important;
+                z-index: 3 !important;
                 background: #1E60D5 !important;
             }
-            .action-icon {
-                text-decoration: none;
-                font-size: 18px;
-                margin: 0 5px;
-                transition: transform 0.2s;
-            }
-            .action-icon:hover { transform: scale(1.2); }
-            .status-pill {
-                padding: 4px 10px;
-                border-radius: 20px;
-                font-size: 11px;
-                font-weight: 600;
-                background: #e3f2fd;
-                color: #1e88e5;
-            }
+            .action-icon { text-decoration: none; font-size: 18px; margin: 0 5px; }
             </style>
         """, unsafe_allow_html=True)
 
-        def fmt(v):
+        def fmt(v): 
             try: return f"₹{float(v):,.2f}" if not pd.isna(v) else "₹0.00"
             except: return "₹0.00"
 
-        # Build Unified Table HTML
+        # Build Table HTML
         table_html = """
-        <div class="main-wrapper">
+        <div class="table-outer-wrapper">
             <table class="vision-table">
                 <thead>
                     <tr>
-                        <th class="sticky-action sticky-header-action">Actions</th>
-                        <th>Project ID</th>
-                        <th>Project</th>
-                        <th>Site ID</th>
-                        <th>Site Name</th>
-                        <th>Cluster</th>
-                        <th>PO Number</th>
-                        <th>Projected Amt</th>
-                        <th>Status</th>
-                        <th>Team Billing</th>
-                        <th>Team Paid</th>
-                        <th>Team Balance</th>
-                        <th>VIS Inv No</th>
-                        <th>VIS Inv Date</th>
-                        <th>VIS Bill Amt</th>
-                        <th>VIS Rec Amt</th>
-                        <th>VIS Balance</th>
+                        <th class="sticky-col sticky-header">Actions</th>
+                        <th>Project ID</th><th>Project</th><th>Site ID</th><th>Site Name</th>
+                        <th>Cluster</th><th>PO Number</th><th>Projected Amt</th><th>Status</th>
+                        <th>Team Billing</th><th>Team Paid</th><th>Team Balance</th><th>VIS Inv No</th>
+                        <th>VIS Bill Amt</th><th>VIS Rec Amt</th><th>VIS Balance</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -270,38 +243,37 @@ elif menu == "📁 Project Management":
             
             table_html += f"""
                 <tr>
-                    <td class="sticky-action">
+                    <td class="sticky-col">
                         <a href="?edit_id={db_id}" target="_self" class="action-icon">✏️</a>
                         <a href="?pay_id={p_id}" target="_self" class="action-icon">💰</a>
                         <a href="?del_id={db_id}&p_id={p_id}" target="_self" class="action-icon">🗑️</a>
                     </td>
-                    <td style="font-weight:700; color:#1E60D5;">{p_id}</td>
+                    <td><b>{p_id}</b></td>
                     <td>{row.get('Project','-')}</td>
                     <td>{row.get('Site ID','-')}</td>
                     <td>{row.get('Site Name','-')}</td>
                     <td>{row.get('Cluster','-')}</td>
                     <td>{row.get('PO Number','-')}</td>
                     <td>{fmt(row.get('Projected Amount'))}</td>
-                    <td><span class="status-pill">{row.get('Site Status','-')}</span></td>
+                    <td>{row.get('Site Status','-')}</td>
                     <td>{fmt(row.get('Team Billing'))}</td>
                     <td>{fmt(row.get('Team paid Amount'))}</td>
-                    <td style="color:#d32f2f; font-weight:700;">{fmt(row.get('Team Balance'))}</td>
+                    <td style="color:red; font-weight:bold;">{fmt(row.get('Team Balance'))}</td>
                     <td>{row.get('VIS Invoice No.','-')}</td>
-                    <td>{row.get('VIS Invoice Date','-')}</td>
                     <td>{fmt(row.get('VIS Bill Amount'))}</td>
                     <td>{fmt(row.get('VIS Received Amt'))}</td>
-                    <td style="color:#f57c00; font-weight:700;">{fmt(row.get('VIS Balance'))}</td>
+                    <td style="color:orange; font-weight:bold;">{fmt(row.get('VIS Balance'))}</td>
                 </tr>
             """
         
         table_html += "</tbody></table></div>"
         
-        # FINAL RENDERING - Increased height for the scroller to be visible
+        # Render the component with enough height to show the scrollbar
         import streamlit.components.v1 as components
-        components.html(table_html, height=600, scrolling=True)
+        components.html(table_html, height=550, scrolling=True)
 
     else:
-        st.info("No projects found.")
+        st.info("No records found.")
 # ================= 💰 FINANCE (UNCHANGED) =================
 elif menu == "💰 Finance":
     st.title("💰 Finance Entry")
