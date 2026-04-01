@@ -94,39 +94,19 @@ if menu == "📊 Dashboard":
     else:
         st.info("No data found in the database.")
 
-# ================= 📁 PROJECT MANAGEMENT (LAVISH STYLE) =================
+# ================= 📁 PROJECT MANAGEMENT (LAVISH & ERROR-FREE) =================
 elif menu == "📁 Project Management":
     st.title("📁 Project Master List")
 
-    # Session states for Form
+    # Session states
     if "edit_id" not in st.session_state: st.session_state.edit_id = None
     if "show_form" not in st.session_state: st.session_state.show_form = False
 
-    # --- TOP TOOLBAR (Buttons in one line, left aligned) ---
-    # Custom CSS for colorful buttons
+    # --- TOP TOOLBAR ---
     st.markdown("""
         <style>
-        .stButton>button { border-radius: 20px; font-weight: bold; padding: 0.5rem 1.5rem; border: none; color: white; }
-        div[data-testid="column"] { display: flex; align-items: flex-end; }
-        .add-btn { background-color: #4A90E2 !important; }
-        .dl-btn { background-color: #F5A623 !important; }
-        .table-container { 
-            overflow-x: auto; 
-            white-space: nowrap; 
-            padding: 10px; 
-            background: #f8f9fa; 
-            border-radius: 15px;
-        }
-        .row-card {
-            background: white;
-            padding: 15px;
-            border-radius: 10px;
-            margin-bottom: 10px;
-            border-left: 5px solid #1E60D5;
-            box-shadow: 2px 2px 10px rgba(0,0,0,0.05);
-            display: inline-block;
-            min-width: 100%;
-        }
+        .stButton>button { border-radius: 10px; font-weight: bold; }
+        .table-container { overflow-x: auto; white-space: nowrap; padding: 10px; background: #f8f9fa; border-radius: 15px; }
         </style>
     """, unsafe_allow_html=True)
 
@@ -139,10 +119,8 @@ elif menu == "📁 Project Management":
             st.rerun()
 
     with t2:
-        # Mini Upload Button
         bulk_file = st.file_uploader("Bulk Upload", type=['xlsx'], label_visibility="collapsed")
     
-    # Fetch Data
     df_master = pd.DataFrame(fetch_table("indus_data"))
     
     with t3:
@@ -153,115 +131,99 @@ elif menu == "📁 Project Management":
             st.download_button("📥 Download", out.getvalue(), "Indus_Report.xlsx", use_container_width=True)
 
     with t4:
-        search = st.text_input("", placeholder="🔍 Search Site, ID, Team, Status...", label_visibility="collapsed")
+        search = st.text_input("", placeholder="🔍 Search Site, ID, Team...", label_visibility="collapsed")
 
     # --- FORM (ADD / EDIT) ---
     if st.session_state.show_form:
         st.write("---")
-        with st.container():
-            st.subheader("📝 Project Entry Form")
-            with st.form("entry_form"):
-                ed = None
+        with st.form("entry_form"):
+            ed = None
+            if st.session_state.edit_id and not df_master.empty:
+                ed_list = df_master[df_master['id'] == st.session_state.edit_id]
+                if not ed_list.empty:
+                    ed = ed_list.iloc[0]
+            
+            st.subheader("📝 Project Details")
+            c1, c2, c3 = st.columns(3)
+            p_name = c1.text_input("Project", value=ed['Project'] if ed is not None else "")
+            p_id = c1.text_input("Project ID", value=ed['Project ID'] if ed is not None else "")
+            s_name = c2.text_input("Site Name", value=ed['Site Name'] if ed is not None else "")
+            t_name = c2.selectbox("Team", ["Team A", "Team B", "Team C"], index=0)
+            t_bill = c3.number_input("Team Billing", value=float(ed['Team Billing']) if ed is not None else 0.0)
+            v_inv = c3.number_input("VIS Inv Amt", value=float(ed['VIS Inv Amt']) if ed is not None else 0.0)
+
+            f_c1, f_c2 = st.columns([1, 4])
+            if f_c1.form_submit_button("💾 Save"):
+                payload = {
+                    "Project": p_name, "Project ID": p_id, "Site Name": s_name, 
+                    "Team Name": t_name, "Team Billing": t_bill, "VIS Inv Amt": v_inv,
+                    "Team Balance": t_bill, "Profit": v_inv - t_bill, "VIS Balance": v_inv
+                }
                 if st.session_state.edit_id:
-                    ed = df_master[df_master['id'] == st.session_state.edit_id].iloc[0]
-                
-                c1, c2, c3, c4 = st.columns(4)
-                p_name = c1.text_input("Project", value=ed['Project'] if ed is not None else "")
-                p_id = c1.text_input("Project ID", value=ed['Project ID'] if ed is not None else "")
-                s_id = c1.text_input("Site ID", value=ed['Site ID'] if ed is not None else "")
-                
-                s_name = c2.text_input("Site Name", value=ed['Site Name'] if ed is not None else "")
-                cluster = c2.text_input("Cluster", value=ed['Cluster'] if ed is not None else "")
-                po_no = c2.text_input("PO Number", value=ed['PO Number'] if ed is not None else "")
-                
-                t_name = c3.selectbox("Team Name", ["Team A", "Team B", "Team C"], index=0)
-                s_status = c3.selectbox("Site Status", ["Pending", "Ongoing", "Completed"])
-                p_amt = c3.number_input("Project Amount", value=float(ed['Project Amount']) if ed is not None else 0.0)
-                
-                t_bill = c4.number_input("Team Billing", value=float(ed['Team Billing']) if ed is not None else 0.0)
-                v_inv = c4.number_input("VIS Inv Amt", value=float(ed['VIS Inv Amt']) if ed is not None else 0.0)
-                v_rec = c4.number_input("VIS Rec Amt", value=float(ed['VIS Rec Amt']) if ed is not None else 0.0)
+                    update_row("indus_data", st.session_state.edit_id, payload)
+                else:
+                    insert_row("indus_data", payload)
+                st.session_state.show_form = False
+                st.rerun()
+            if f_c2.form_submit_button("❌ Cancel"):
+                st.session_state.show_form = False
+                st.rerun()
 
-                f_c1, f_c2 = st.columns([1, 5])
-                if f_c1.form_submit_button("💾 Save Data"):
-                    # Calculations
-                    payload = {
-                        "Project": p_name, "Project ID": p_id, "Site ID": s_id, "Site Name": s_name,
-                        "Cluster": cluster, "PO Number": po_no, "Project Amount": p_amt,
-                        "Team Name": t_name, "Site Status": s_status, "Team Billing": t_bill,
-                        "Team Balance": t_bill, "VIS Inv Amt": v_inv, "VIS Rec Amt": v_rec,
-                        "VIS Balance": v_inv - v_rec, "Profit": v_inv - t_bill
-                    }
-                    if st.session_state.edit_id:
-                        update_row("indus_data", st.session_state.edit_id, payload)
-                    else:
-                        insert_row("indus_data", payload)
-                    st.session_state.show_form = False
-                    st.rerun()
-                if f_c2.form_submit_button("❌ Cancel"):
-                    st.session_state.show_form = False
-                    st.rerun()
-
-    # --- THE LAVISH SCROLLABLE TABLE ---
+    # --- THE TABLE WITH PAGINATION FIX ---
     if not df_master.empty:
-        # Search & Filter
+        # Search Filter
         if search:
             df_display = df_master[df_master.astype(str).apply(lambda x: x.str.contains(search, case=False)).any(axis=1)]
         else:
             df_display = df_master
 
-        # Pagination
+        # PAGINATION FIX: RangeError prevention
         p_size = 5
-        tot_p = max(1, (len(df_display) // p_size) + (1 if len(df_display) % p_size > 0 else 0))
-        curr_p = st.select_slider("Select Page", options=range(1, tot_p + 1))
+        total_rows = len(df_display)
         
-        start = (curr_p - 1) * p_size
-        end = start + p_size
-
-        st.write("### 📋 Detailed Records")
-        
-        # Horizontal Scroller Container Start
-        st.markdown('<div class="table-container">', unsafe_allow_html=True)
-        
-        for i, row in df_display.iloc[start:end].iterrows():
-            rid = row.get('id', i)
+        if total_rows > 0:
+            total_p = (total_rows // p_size) + (1 if total_rows % p_size > 0 else 0)
             
-            # Lavish Card Row
-            with st.container():
-                # Action Buttons Column
-                btn_c1, btn_c2, btn_c3, d_c1, d_c2, d_c3, d_c4, d_c5 = st.columns([0.4, 0.4, 0.4, 1.5, 1.5, 1.5, 1.2, 1.2])
-                
-                if btn_c1.button("✏️", key=f"e_{rid}"):
-                    st.session_state.edit_id = rid
-                    st.session_state.show_form = True
-                    st.rerun()
-                
-                if btn_c2.button("💰", key=f"p_{rid}"):
-                    st.toast(f"Opening Payment for {row['Project ID']}")
-                    # Finance menu pe redirect logic yahan dal sakte hain
-                
-                if btn_c3.button("🗑️", key=f"d_{rid}"):
-                    # Confirmation simple modal
-                    st.error(f"Deleting {row['Project ID']}...")
-                    delete_row("indus_data", rid)
-                    st.rerun()
+            # Slider sirf tab dikhega jab 1 se zyada page honge
+            if total_p > 1:
+                curr_p = st.slider("Select Page", 1, total_p, 1)
+            else:
+                curr_p = 1
+            
+            start = (curr_p - 1) * p_size
+            end = start + p_size
 
-                d_c1.markdown(f"**ID:** <br> `{row['Project ID']}`", unsafe_allow_html=True)
-                d_c2.markdown(f"**Project / Site:** <br> {row['Project']} - {row['Site Name']}", unsafe_allow_html=True)
-                d_c3.markdown(f"**Team:** <br> <span style='color:blue'>{row['Team Name']}</span>", unsafe_allow_html=True)
-                
-                # Dynamic Balance Color logic
-                bal_color = "red" if row['Team Balance'] > 0 else "green"
-                d_c4.markdown(f"**Team Bal:** <br> <span style='color:{bal_color}'>₹{row['Team Balance']}</span>", unsafe_allow_html=True)
-                
-                d_c5.markdown(f"**Profit:** <br> <span style='color:green'>₹{row['Profit']}</span>", unsafe_allow_html=True)
-                
-                st.markdown("---")
-        
-        st.markdown('</div>', unsafe_allow_html=True) # Horizontal Scroller End
+            st.write("### 📋 Detailed Records")
+            st.markdown('<div class="table-container">', unsafe_allow_html=True)
+            
+            for i, row in df_display.iloc[start:end].iterrows():
+                rid = row.get('id', i)
+                with st.container():
+                    b1, b2, b3, d1, d2, d3, d4 = st.columns([0.4, 0.4, 0.4, 1.5, 2, 1.5, 1.5])
+                    
+                    if b1.button("✏️", key=f"e_{rid}"):
+                        st.session_state.edit_id = rid
+                        st.session_state.show_form = True
+                        st.rerun()
+                    
+                    if b2.button("💰", key=f"p_{rid}"):
+                        st.toast(f"Go to Finance for {row['Project ID']}")
+                    
+                    if b3.button("🗑️", key=f"d_{rid}"):
+                        delete_row("indus_data", rid)
+                        st.rerun()
 
+                    d1.markdown(f"**ID:**<br>`{row['Project ID']}`", unsafe_allow_html=True)
+                    d2.markdown(f"**Project:**<br>{row['Project']} - {row['Site Name']}", unsafe_allow_html=True)
+                    d3.markdown(f"**Team:**<br>{row['Team Name']}", unsafe_allow_html=True)
+                    d4.markdown(f"**Profit:**<br>₹{row.get('Profit', 0)}", unsafe_allow_html=True)
+                    st.divider()
+            
+            st.markdown('</div>', unsafe_allow_html=True)
+        else:
+            st.warning("No matching records found for your search.")
     else:
-        st.info("No projects found. Use 'Add New' to start.")
+        st.info("Database is empty. Click 'Add New' to start.")
 # ================= 💰 FINANCE (UNCHANGED) =================
 elif menu == "💰 Finance":
     st.title("💰 Finance Entry")
