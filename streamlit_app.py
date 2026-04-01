@@ -94,7 +94,7 @@ if menu == "📊 Dashboard":
     else:
         st.info("No data found in the database.")
 
-# ================= 📁 PROJECT MANAGEMENT (WITH SEARCH & 5-LINE PAGINATION) =================
+# ================= 📁 PROJECT MANAGEMENT (LAVISH STYLE) =================
 elif menu == "📁 Project Management":
     st.title("📁 Project Master List")
 
@@ -102,91 +102,166 @@ elif menu == "📁 Project Management":
     if "edit_id" not in st.session_state: st.session_state.edit_id = None
     if "show_form" not in st.session_state: st.session_state.show_form = False
 
-    # Top Buttons
-    c_btn1, c_btn2, c_btn3, c_src = st.columns([1, 1.5, 1, 3])
-    
-    if c_btn1.button("➕ Add New"):
-        st.session_state.show_form = True
-        st.session_state.edit_id = None
+    # --- TOP TOOLBAR (Buttons in one line, left aligned) ---
+    # Custom CSS for colorful buttons
+    st.markdown("""
+        <style>
+        .stButton>button { border-radius: 20px; font-weight: bold; padding: 0.5rem 1.5rem; border: none; color: white; }
+        div[data-testid="column"] { display: flex; align-items: flex-end; }
+        .add-btn { background-color: #4A90E2 !important; }
+        .dl-btn { background-color: #F5A623 !important; }
+        .table-container { 
+            overflow-x: auto; 
+            white-space: nowrap; 
+            padding: 10px; 
+            background: #f8f9fa; 
+            border-radius: 15px;
+        }
+        .row-card {
+            background: white;
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 10px;
+            border-left: 5px solid #1E60D5;
+            box-shadow: 2px 2px 10px rgba(0,0,0,0.05);
+            display: inline-block;
+            min-width: 100%;
+        }
+        </style>
+    """, unsafe_allow_html=True)
 
-    bulk_file = c_btn2.file_uploader("Bulk Upload", type=['xlsx'], label_visibility="collapsed")
+    t1, t2, t3, t4 = st.columns([1, 1, 1, 3])
+    
+    with t1:
+        if st.button("➕ Add New", use_container_width=True):
+            st.session_state.show_form = True
+            st.session_state.edit_id = None
+            st.rerun()
+
+    with t2:
+        # Mini Upload Button
+        bulk_file = st.file_uploader("Bulk Upload", type=['xlsx'], label_visibility="collapsed")
     
     # Fetch Data
     df_master = pd.DataFrame(fetch_table("indus_data"))
     
-    if not df_master.empty:
-        # Download
-        out = BytesIO()
-        with pd.ExcelWriter(out, engine='xlsxwriter') as wr:
-            df_master.to_excel(wr, index=False)
-        c_btn3.download_button("📥 Download", out.getvalue(), "Indus_Report.xlsx")
+    with t3:
+        if not df_master.empty:
+            out = BytesIO()
+            with pd.ExcelWriter(out, engine='xlsxwriter') as wr:
+                df_master.to_excel(wr, index=False)
+            st.download_button("📥 Download", out.getvalue(), "Indus_Report.xlsx", use_container_width=True)
 
-    search = c_src.text_input("🔍 Search Anything...", placeholder="Type Site, ID or Team...")
+    with t4:
+        search = st.text_input("", placeholder="🔍 Search Site, ID, Team, Status...", label_visibility="collapsed")
 
-    # Form (Add/Edit)
+    # --- FORM (ADD / EDIT) ---
     if st.session_state.show_form:
-        with st.expander("📝 Project Form", expanded=True):
+        st.write("---")
+        with st.container():
+            st.subheader("📝 Project Entry Form")
             with st.form("entry_form"):
                 ed = None
                 if st.session_state.edit_id:
                     ed = df_master[df_master['id'] == st.session_state.edit_id].iloc[0]
                 
-                col1, col2, col3 = st.columns(3)
-                p_name = col1.text_input("Project", value=ed['Project'] if ed is not None else "")
-                p_id = col1.text_input("Project ID", value=ed['Project ID'] if ed is not None else "")
-                s_name = col2.text_input("Site Name", value=ed['Site Name'] if ed is not None else "")
-                t_name = col2.selectbox("Team", ["Team A", "Team B", "Team C"], index=0)
-                t_bill = col3.number_input("Team Billing", value=float(ed['Team Billing']) if ed is not None else 0.0)
-                v_amt = col3.number_input("VIS Inv Amt", value=float(ed['VIS Inv Amt']) if ed is not None else 0.0)
+                c1, c2, c3, c4 = st.columns(4)
+                p_name = c1.text_input("Project", value=ed['Project'] if ed is not None else "")
+                p_id = c1.text_input("Project ID", value=ed['Project ID'] if ed is not None else "")
+                s_id = c1.text_input("Site ID", value=ed['Site ID'] if ed is not None else "")
                 
-                if st.form_submit_button("💾 Save"):
-                    payload = {"Project": p_name, "Project ID": p_id, "Site Name": s_name, "Team Name": t_name, "Team Billing": t_bill, "VIS Inv Amt": v_amt, "Profit": v_amt - t_bill}
+                s_name = c2.text_input("Site Name", value=ed['Site Name'] if ed is not None else "")
+                cluster = c2.text_input("Cluster", value=ed['Cluster'] if ed is not None else "")
+                po_no = c2.text_input("PO Number", value=ed['PO Number'] if ed is not None else "")
+                
+                t_name = c3.selectbox("Team Name", ["Team A", "Team B", "Team C"], index=0)
+                s_status = c3.selectbox("Site Status", ["Pending", "Ongoing", "Completed"])
+                p_amt = c3.number_input("Project Amount", value=float(ed['Project Amount']) if ed is not None else 0.0)
+                
+                t_bill = c4.number_input("Team Billing", value=float(ed['Team Billing']) if ed is not None else 0.0)
+                v_inv = c4.number_input("VIS Inv Amt", value=float(ed['VIS Inv Amt']) if ed is not None else 0.0)
+                v_rec = c4.number_input("VIS Rec Amt", value=float(ed['VIS Rec Amt']) if ed is not None else 0.0)
+
+                f_c1, f_c2 = st.columns([1, 5])
+                if f_c1.form_submit_button("💾 Save Data"):
+                    # Calculations
+                    payload = {
+                        "Project": p_name, "Project ID": p_id, "Site ID": s_id, "Site Name": s_name,
+                        "Cluster": cluster, "PO Number": po_no, "Project Amount": p_amt,
+                        "Team Name": t_name, "Site Status": s_status, "Team Billing": t_bill,
+                        "Team Balance": t_bill, "VIS Inv Amt": v_inv, "VIS Rec Amt": v_rec,
+                        "VIS Balance": v_inv - v_rec, "Profit": v_inv - t_bill
+                    }
                     if st.session_state.edit_id:
                         update_row("indus_data", st.session_state.edit_id, payload)
                     else:
                         insert_row("indus_data", payload)
                     st.session_state.show_form = False
                     st.rerun()
+                if f_c2.form_submit_button("❌ Cancel"):
+                    st.session_state.show_form = False
+                    st.rerun()
 
-    # Table with 5 lines & Actions
+    # --- THE LAVISH SCROLLABLE TABLE ---
     if not df_master.empty:
-        # Search Filter
+        # Search & Filter
         if search:
             df_display = df_master[df_master.astype(str).apply(lambda x: x.str.contains(search, case=False)).any(axis=1)]
         else:
             df_display = df_master
 
-        # Pagination (5 Rows)
-        page_size = 5
-        total_p = (len(df_display) // page_size) + (1 if len(df_display) % page_size > 0 else 0)
-        curr_p = st.number_input("Page", 1, total_p, 1)
+        # Pagination
+        p_size = 5
+        tot_p = max(1, (len(df_display) // p_size) + (1 if len(df_display) % p_size > 0 else 0))
+        curr_p = st.select_slider("Select Page", options=range(1, tot_p + 1))
         
-        start = (curr_p - 1) * page_size
-        end = start + page_size
+        start = (curr_p - 1) * p_size
+        end = start + p_size
 
-        st.write("---")
+        st.write("### 📋 Detailed Records")
+        
+        # Horizontal Scroller Container Start
+        st.markdown('<div class="table-container">', unsafe_allow_html=True)
+        
         for i, row in df_display.iloc[start:end].iterrows():
+            rid = row.get('id', i)
+            
+            # Lavish Card Row
             with st.container():
-                cols = st.columns([0.5, 0.5, 0.5, 2, 2, 2, 2])
-                # Safe ID Access
-                rid = row.get('id', i)
+                # Action Buttons Column
+                btn_c1, btn_c2, btn_c3, d_c1, d_c2, d_c3, d_c4, d_c5 = st.columns([0.4, 0.4, 0.4, 1.5, 1.5, 1.5, 1.2, 1.2])
                 
-                if cols[0].button("✏️", key=f"e_{rid}"):
+                if btn_c1.button("✏️", key=f"e_{rid}"):
                     st.session_state.edit_id = rid
                     st.session_state.show_form = True
                     st.rerun()
-                if cols[1].button("💰", key=f"p_{rid}"):
-                    st.info(f"Pay entry for {row['Project ID']}")
-                if cols[2].button("🗑️", key=f"d_{rid}"):
+                
+                if btn_c2.button("💰", key=f"p_{rid}"):
+                    st.toast(f"Opening Payment for {row['Project ID']}")
+                    # Finance menu pe redirect logic yahan dal sakte hain
+                
+                if btn_c3.button("🗑️", key=f"d_{rid}"):
+                    # Confirmation simple modal
+                    st.error(f"Deleting {row['Project ID']}...")
                     delete_row("indus_data", rid)
                     st.rerun()
-                
-                cols[3].write(f"**ID:** {row['Project ID']}")
-                cols[4].write(f"**Site:** {row['Site Name']}")
-                cols[5].write(f"**Team:** {row['Team Name']}")
-                cols[6].write(f"**Profit:** ₹{row['Profit']}")
-                st.write("---")
 
+                d_c1.markdown(f"**ID:** <br> `{row['Project ID']}`", unsafe_allow_html=True)
+                d_c2.markdown(f"**Project / Site:** <br> {row['Project']} - {row['Site Name']}", unsafe_allow_html=True)
+                d_c3.markdown(f"**Team:** <br> <span style='color:blue'>{row['Team Name']}</span>", unsafe_allow_html=True)
+                
+                # Dynamic Balance Color logic
+                bal_color = "red" if row['Team Balance'] > 0 else "green"
+                d_c4.markdown(f"**Team Bal:** <br> <span style='color:{bal_color}'>₹{row['Team Balance']}</span>", unsafe_allow_html=True)
+                
+                d_c5.markdown(f"**Profit:** <br> <span style='color:green'>₹{row['Profit']}</span>", unsafe_allow_html=True)
+                
+                st.markdown("---")
+        
+        st.markdown('</div>', unsafe_allow_html=True) # Horizontal Scroller End
+
+    else:
+        st.info("No projects found. Use 'Add New' to start.")
 # ================= 💰 FINANCE (UNCHANGED) =================
 elif menu == "💰 Finance":
     st.title("💰 Finance Entry")
