@@ -173,7 +173,7 @@ elif menu == "📁 Project Management":
                     st.rerun()
 
     # --- 2. HANDLE URL PARAMS (TRIGGER POP-UPS) ---
-if "edit_id" in st.query_params:
+    if "edit_id" in st.query_params:
         rid = int(st.query_params["edit_id"])
         
         # URL clean karein taaki refresh par wapas na khule, par page Project hi rahe
