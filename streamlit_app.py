@@ -94,9 +94,26 @@ if menu == "📊 Dashboard":
     else:
         st.info("No data found in the database.")
 
-# ================= 📁 PROJECT MANAGEMENT (FIXED INDENTATION) =================
+# ================= 📁 PROJECT MANAGEMENT (WITH ACTION BUTTONS IN TABLE) =================
 elif menu == "📁 Project Management":
     st.title("📁 Project Management Portal")
+
+    # --- HANDLE QUERY PARAMETERS (FOR TABLE BUTTONS) ---
+    query_params = st.query_params
+    if "edit_id" in query_params:
+        st.session_state.edit_id = int(query_params["edit_id"])
+        st.session_state.show_form = True
+        st.query_params.clear() # Clear URL after taking ID
+        st.rerun()
+    
+    if "delete_id" in query_params:
+        delete_row("indus_data", int(query_params["delete_id"]))
+        st.query_params.clear()
+        st.rerun()
+
+    if "pay_id" in query_params:
+        st.toast(f"Opening Finance for Project ID: {query_params['pay_id']}")
+        st.query_params.clear()
 
     if "edit_id" not in st.session_state: st.session_state.edit_id = None
     if "show_form" not in st.session_state: st.session_state.show_form = False
@@ -122,74 +139,107 @@ elif menu == "📁 Project Management":
     with t4:
         search = st.text_input("", placeholder="🔍 Search Site, ID or Team...", label_visibility="collapsed")
 
-    # --- THE TRUE TABLE ---
+    # --- FORM CODE (Add/Edit) ---
+    if st.session_state.show_form:
+        st.divider()
+        with st.form("master_form"):
+            ed = None
+            if st.session_state.edit_id and not df_m.empty:
+                ed_row = df_m[df_m['id'] == st.session_state.edit_id]
+                if not ed_row.empty: ed = ed_row.iloc[0]
+            
+            st.subheader("📝 Project Entry Form")
+            c1, c2, c3, c4 = st.columns(4)
+            p_type = c1.selectbox("Project", ["Airtel", "Jio", "VIL", "O&M"], index=0)
+            p_id = c2.text_input("Project ID", value=ed['Project ID'] if ed is not None else "")
+            s_name = c3.text_input("Site Name", value=ed['Site Name'] if ed is not None else "")
+            t_name = c4.selectbox("Team Name", ["Team A", "Team B", "Team C", "Team D"])
+            
+            t_bill = c1.number_input("Team Billing", value=float(ed.get('Team Billing', 0)) if ed is not None else 0.0)
+            t_paid = c2.number_input("Team Paid Amount", value=float(ed.get('Team paid Amount', 0)) if ed is not None else 0.0)
+            v_amt = c3.number_input("VIS Bill Amt", value=float(ed.get('VIS Bill Amount', 0)) if ed is not None else 0.0)
+            v_rec = c4.number_input("VIS Rec Amt", value=float(ed.get('VIS Received Amt', 0)) if ed is not None else 0.0)
+
+            if st.form_submit_button("💾 Save Project"):
+                payload = {
+                    "Project": p_type, "Project ID": p_id, "Site Name": s_name, "Team Name": t_name,
+                    "Team Billing": t_bill, "Team paid Amount": t_paid, "Team Balance": t_bill - t_paid,
+                    "VIS Bill Amount": v_amt, "VIS Received Amt": v_rec, "VIS Balance": v_amt - v_rec,
+                    "Profit": v_amt - t_bill
+                }
+                if st.session_state.edit_id:
+                    update_row("indus_data", st.session_state.edit_id, payload)
+                else:
+                    insert_row("indus_data", payload)
+                st.session_state.show_form = False
+                st.rerun()
+
+    # --- TABLE WITH ACTION BUTTONS ---
     if not df_m.empty:
-        # Search Filter
         df_f = df_m[df_m.astype(str).apply(lambda x: x.str.contains(search, case=False)).any(axis=1)] if search else df_m
-        
-        # Pagination
         pg_size = 5
         tot_pgs = max(1, (len(df_f) // pg_size) + (1 if len(df_f) % pg_size > 0 else 0))
         curr_pg = st.number_input("Page", 1, tot_pgs, 1)
-        
-        # Helper function to clean values (Fix for ₹nan)
-        def clean_val(val):
-            try:
-                v = float(val)
-                return 0.0 if pd.isna(v) else v
-            except:
-                return 0.0
 
-        # Build HTML Table Rows
+        def clean_val(val):
+            try: v = float(val); return 0.0 if pd.isna(v) else v
+            except: return 0.0
+
         table_rows = ""
         for _, row in df_f.iloc[(curr_pg-1)*pg_size : curr_pg*pg_size].iterrows():
-            p_amt = clean_val(row.get('Projected Amount'))
-            t_bill = clean_val(row.get('Team Billing'))
-            t_paid = clean_val(row.get('Team paid Amount'))
-            t_bal = clean_val(row.get('Team Balance'))
-            v_bill = clean_val(row.get('VIS Bill Amount'))
-            v_rec = clean_val(row.get('VIS Received Amt'))
-            v_bal = clean_val(row.get('VIS Balance'))
+            rid = row.get('id')
+            p_id_val = row.get('Project ID')
+            
+            # --- ACTION URLS ---
+            # Yeh URLs page refresh karke query parameters bhejenge
+            edit_url = f"?edit_id={rid}"
+            del_url = f"?delete_id={rid}"
+            pay_url = f"?pay_id={p_id_val}"
 
             table_rows += f"""
             <tr>
-                <td><b>{row.get('Project ID','-')}</b></td>
+                <td style="min-width:100px;">
+                    <a href="{edit_url}" target="_self" style="text-decoration:none;">✏️</a> &nbsp;
+                    <a href="{pay_url}" target="_self" style="text-decoration:none;">💰</a> &nbsp;
+                    <a href="{del_url}" target="_self" style="text-decoration:none; color:red;">🗑️</a>
+                </td>
+                <td><b>{p_id_val}</b></td>
                 <td>{row.get('Project','-')}</td>
                 <td>{row.get('Site ID','-')}</td>
                 <td>{row.get('Site Name','-')}</td>
                 <td>{row.get('Cluster','-')}</td>
                 <td>{row.get('PO Number','-')}</td>
-                <td>₹{p_amt:,.2f}</td>
+                <td>₹{clean_val(row.get('Projected Amount')):,.2f}</td>
                 <td>{row.get('Team Name','-')}</td>
                 <td>{row.get('Site Status','-')}</td>
-                <td>₹{t_bill:,.2f}</td>
-                <td>₹{t_paid:,.2f}</td>
-                <td style="color:red; font-weight:bold;">₹{t_bal:,.2f}</td>
+                <td>₹{clean_val(row.get('Team Billing')):,.2f}</td>
+                <td>₹{clean_val(row.get('Team paid Amount')):,.2f}</td>
+                <td style="color:red; font-weight:bold;">₹{clean_val(row.get('Team Balance')):,.2f}</td>
                 <td>{row.get('VIS Invoice No.','-')}</td>
                 <td>{row.get('VIS Invoice Date','-')}</td>
-                <td>₹{v_bill:,.2f}</td>
-                <td>₹{v_rec:,.2f}</td>
-                <td style="color:orange; font-weight:bold;">₹{v_bal:,.2f}</td>
+                <td>₹{clean_val(row.get('VIS Bill Amount')):,.2f}</td>
+                <td>₹{clean_val(row.get('VIS Received Amt')):,.2f}</td>
+                <td style="color:orange; font-weight:bold;">₹{clean_val(row.get('VIS Balance')):,.2f}</td>
             </tr>
             """
 
-        # HTML Component for 100% Reliability
-        full_html_code = f"""
+        full_html = f"""
         <html>
         <head>
         <style>
             .container {{ width: 100%; overflow-x: auto; font-family: sans-serif; }}
-            table {{ width: 100%; border-collapse: collapse; min-width: 2600px; border: 1px solid #ddd; }}
+            table {{ width: 100%; border-collapse: collapse; min-width: 2800px; border: 1px solid #ddd; }}
             th {{ background-color: #1E60D5; color: white; padding: 12px; text-align: left; position: sticky; top: 0; }}
             td {{ padding: 12px; border-bottom: 1px solid #eee; font-size: 13px; background: white; }}
             tr:hover {{ background-color: #f1f5f9; }}
+            a {{ font-size: 16px; cursor: pointer; }}
         </style>
         </head>
         <body>
             <div class="container">
                 <table>
                     <tr>
-                        <th>Project ID</th><th>Project</th><th>Site ID</th><th>Site Name</th>
+                        <th>Actions</th><th>Project ID</th><th>Project</th><th>Site ID</th><th>Site Name</th>
                         <th>Cluster</th><th>PO Number</th><th>Projected Amt</th><th>Team Name</th>
                         <th>Status</th><th>Team Billing</th><th>Team Paid</th><th>Team Bal</th>
                         <th>VIS Inv No</th><th>VIS Inv Date</th><th>VIS Bill Amt</th><th>VIS Rec Amt</th><th>VIS Balance</th>
@@ -200,27 +250,8 @@ elif menu == "📁 Project Management":
         </body>
         </html>
         """
-        
         import streamlit.components.v1 as components
-        components.html(full_html_code, height=400, scrolling=True)
-
-        # --- ACTIONS ---
-        st.write("### ⚙️ Actions")
-        f1, f2, f3 = st.columns([4, 2, 2])
-        visible_ids = df_f['Project ID'].iloc[(curr_pg-1)*pg_size : curr_pg*pg_size].tolist()
-        if visible_ids:
-            target_id = f1.selectbox("Select ID for Edit/Delete", visible_ids)
-            
-            if f2.button("✏️ Edit Selected", use_container_width=True):
-                target_row = df_f[df_f['Project ID'] == target_id].iloc[0]
-                st.session_state.edit_id = target_row['id']
-                st.session_state.show_form = True
-                st.rerun()
-
-            if f3.button("🗑️ Delete Selected", use_container_width=True):
-                target_row = df_f[df_f['Project ID'] == target_id].iloc[0]
-                delete_row("indus_data", target_row['id'])
-                st.rerun()
+        components.html(full_html, height=400, scrolling=True)
     else:
         st.info("No data found.")
 # ================= 💰 FINANCE (UNCHANGED) =================
