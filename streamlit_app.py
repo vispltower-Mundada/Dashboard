@@ -94,7 +94,7 @@ if menu == "📊 Dashboard":
     else:
         st.info("No data found in the database.")
 
-# ================= 📁 PROJECT MANAGEMENT (STRICT TABLE COMPONENT) =================
+# ================= 📁 PROJECT MANAGEMENT (FIXED INDENTATION) =================
 elif menu == "📁 Project Management":
     st.title("📁 Project Management Portal")
 
@@ -122,9 +122,9 @@ elif menu == "📁 Project Management":
     with t4:
         search = st.text_input("", placeholder="🔍 Search Site, ID or Team...", label_visibility="collapsed")
 
-    # --- THE TRUE TABLE (Using HTML Component for 100% Reliability) ---
+    # --- THE TRUE TABLE ---
     if not df_m.empty:
-        # Filter
+        # Search Filter
         df_f = df_m[df_m.astype(str).apply(lambda x: x.str.contains(search, case=False)).any(axis=1)] if search else df_m
         
         # Pagination
@@ -132,54 +132,55 @@ elif menu == "📁 Project Management":
         tot_pgs = max(1, (len(df_f) // pg_size) + (1 if len(df_f) % pg_size > 0 else 0))
         curr_pg = st.number_input("Page", 1, tot_pgs, 1)
         
-# Build HTML String
-table_rows = ""
-for _, row in df_f.iloc[(curr_pg-1)*pg_size : curr_pg*pg_size].iterrows():
-    # --- CLEANING VALUES (Fix for ₹nan) ---
-    def clean_val(val):
-        try:
-            v = float(val)
-            return 0.0 if pd.isna(v) else v
-        except:
-            return 0.0
+        # Helper function to clean values (Fix for ₹nan)
+        def clean_val(val):
+            try:
+                v = float(val)
+                return 0.0 if pd.isna(v) else v
+            except:
+                return 0.0
 
-    p_amt = clean_val(row.get('Projected Amount'))
-    t_bill = clean_val(row.get('Team Billing'))
-    t_paid = clean_val(row.get('Team paid Amount'))
-    t_bal = clean_val(row.get('Team Balance'))
-    v_bill = clean_val(row.get('VIS Bill Amount'))
-    v_rec = clean_val(row.get('VIS Received Amt'))
-    v_bal = clean_val(row.get('VIS Balance'))
+        # Build HTML Table Rows
+        table_rows = ""
+        for _, row in df_f.iloc[(curr_pg-1)*pg_size : curr_pg*pg_size].iterrows():
+            p_amt = clean_val(row.get('Projected Amount'))
+            t_bill = clean_val(row.get('Team Billing'))
+            t_paid = clean_val(row.get('Team paid Amount'))
+            t_bal = clean_val(row.get('Team Balance'))
+            v_bill = clean_val(row.get('VIS Bill Amount'))
+            v_rec = clean_val(row.get('VIS Received Amt'))
+            v_bal = clean_val(row.get('VIS Balance'))
 
-    table_rows += f"""
-    <tr>
-        <td><b>{row.get('Project ID','-')}</b></td>
-        <td>{row.get('Project','-')}</td>
-        <td>{row.get('Site ID','-')}</td>
-        <td>{row.get('Site Name','-')}</td>
-        <td>{row.get('Cluster','-')}</td>
-        <td>{row.get('PO Number','-')}</td>
-        <td>₹{p_amt:,.2f}</td>
-        <td>{row.get('Team Name','-')}</td>
-        <td>{row.get('Site Status','-')}</td>
-        <td>₹{t_bill:,.2f}</td>
-        <td>₹{t_paid:,.2f}</td>
-        <td style="color:red; font-weight:bold;">₹{t_bal:,.2f}</td>
-        <td>{row.get('VIS Invoice No.','-')}</td>
-        <td>{row.get('VIS Invoice Date','-')}</td>
-        <td>₹{v_bill:,.2f}</td>
-        <td>₹{v_rec:,.2f}</td>
-        <td style="color:orange; font-weight:bold;">₹{v_bal:,.2f}</td>
-    </tr>
-    """
+            table_rows += f"""
+            <tr>
+                <td><b>{row.get('Project ID','-')}</b></td>
+                <td>{row.get('Project','-')}</td>
+                <td>{row.get('Site ID','-')}</td>
+                <td>{row.get('Site Name','-')}</td>
+                <td>{row.get('Cluster','-')}</td>
+                <td>{row.get('PO Number','-')}</td>
+                <td>₹{p_amt:,.2f}</td>
+                <td>{row.get('Team Name','-')}</td>
+                <td>{row.get('Site Status','-')}</td>
+                <td>₹{t_bill:,.2f}</td>
+                <td>₹{t_paid:,.2f}</td>
+                <td style="color:red; font-weight:bold;">₹{t_bal:,.2f}</td>
+                <td>{row.get('VIS Invoice No.','-')}</td>
+                <td>{row.get('VIS Invoice Date','-')}</td>
+                <td>₹{v_bill:,.2f}</td>
+                <td>₹{v_rec:,.2f}</td>
+                <td style="color:orange; font-weight:bold;">₹{v_bal:,.2f}</td>
+            </tr>
+            """
 
+        # HTML Component for 100% Reliability
         full_html_code = f"""
         <html>
         <head>
         <style>
             .container {{ width: 100%; overflow-x: auto; font-family: sans-serif; }}
             table {{ width: 100%; border-collapse: collapse; min-width: 2600px; border: 1px solid #ddd; }}
-            th {{ background-color: #1E60D5; color: white; padding: 12px; text-align: left; }}
+            th {{ background-color: #1E60D5; color: white; padding: 12px; text-align: left; position: sticky; top: 0; }}
             td {{ padding: 12px; border-bottom: 1px solid #eee; font-size: 13px; background: white; }}
             tr:hover {{ background-color: #f1f5f9; }}
         </style>
@@ -200,26 +201,26 @@ for _, row in df_f.iloc[(curr_pg-1)*pg_size : curr_pg*pg_size].iterrows():
         </html>
         """
         
-        # This component ensures NO CODE LEAKS as text
         import streamlit.components.v1 as components
-        components.html(full_html_code, height=450, scrolling=True)
+        components.html(full_html_code, height=400, scrolling=True)
 
-        # --- ACTION SECTION ---
+        # --- ACTIONS ---
         st.write("### ⚙️ Actions")
         f1, f2, f3 = st.columns([4, 2, 2])
         visible_ids = df_f['Project ID'].iloc[(curr_pg-1)*pg_size : curr_pg*pg_size].tolist()
-        target_id = f1.selectbox("Select ID for Edit/Delete", visible_ids)
-        
-        if f2.button("✏️ Edit Selected", use_container_width=True):
-            target_row = df_f[df_f['Project ID'] == target_id].iloc[0]
-            st.session_state.edit_id = target_row['id']
-            st.session_state.show_form = True
-            st.rerun()
+        if visible_ids:
+            target_id = f1.selectbox("Select ID for Edit/Delete", visible_ids)
+            
+            if f2.button("✏️ Edit Selected", use_container_width=True):
+                target_row = df_f[df_f['Project ID'] == target_id].iloc[0]
+                st.session_state.edit_id = target_row['id']
+                st.session_state.show_form = True
+                st.rerun()
 
-        if f3.button("🗑️ Delete Selected", use_container_width=True):
-            target_row = df_f[df_f['Project ID'] == target_id].iloc[0]
-            delete_row("indus_data", target_row['id'])
-            st.rerun()
+            if f3.button("🗑️ Delete Selected", use_container_width=True):
+                target_row = df_f[df_f['Project ID'] == target_id].iloc[0]
+                delete_row("indus_data", target_row['id'])
+                st.rerun()
     else:
         st.info("No data found.")
 # ================= 💰 FINANCE (UNCHANGED) =================
