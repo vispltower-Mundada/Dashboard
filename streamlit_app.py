@@ -94,9 +94,9 @@ if menu == "📊 Dashboard":
     else:
         st.info("No data found in the database.")
 
-# ================= 📁 PROJECT MANAGEMENT (STRICT ERROR-FREE VERSION) =================
+# ================= 📁 PROJECT MANAGEMENT (UNIFIED TABLE) =================
 elif menu == "📁 Project Management":
-    st.title("📁 Project Management Portal")
+    st.title("📁 Project Master List")
 
     # --- 1. POP-UP DIALOGS ---
     @st.dialog("📝 Edit Site Details", width="large")
@@ -104,12 +104,10 @@ elif menu == "📁 Project Management":
         st.write(f"Editing Project ID: **{row_data.get('Project ID', 'N/A')}**")
         with st.form("edit_site_form"):
             c1, c2, c3 = st.columns(3)
-            # Safe get use kar rahe hain taaki crash na ho
             p_name = c1.text_input("Project", value=str(row_data.get('Project', '')))
             s_name = c2.text_input("Site Name", value=str(row_data.get('Site Name', '')))
             t_name = c3.selectbox("Team", ["Team A", "Team B", "Team C", "Team D"], index=0)
             
-            # Numeric values ko safely float mein convert kar rahe hain
             def to_f(v): 
                 try: return float(v) if v and not pd.isna(v) else 0.0
                 except: return 0.0
@@ -119,21 +117,15 @@ elif menu == "📁 Project Management":
             v_amt = c3.number_input("VIS Bill Amount", value=to_f(row_data.get('VIS Bill Amount')))
             
             if st.form_submit_button("✅ Save Changes"):
-                # Database Update Logic
                 payload = {
                     "Project": p_name, "Site Name": s_name, "Team Name": t_name,
                     "Team Billing": t_bill, "Team paid Amount": t_paid,
                     "Team Balance": t_bill - t_paid, "VIS Bill Amount": v_amt,
                     "Profit": v_amt - t_bill
                 }
-                # row_id ke liye 'id' ya 'ID' dono check karenge
                 actual_id = row_data.get('id') if row_data.get('id') else row_data.get('ID')
-                if actual_id:
-                    update_row("indus_data", actual_id, payload)
-                    st.success("Updated!")
-                    st.rerun()
-                else:
-                    st.error("Error: Record ID not found in database.")
+                update_row("indus_data", actual_id, payload)
+                st.rerun()
 
     @st.dialog("🗑️ Confirm Delete")
     def delete_modal(row_id, p_id):
@@ -145,87 +137,82 @@ elif menu == "📁 Project Management":
     # --- 2. TOOLBAR ---
     t1, t2, t3, t4 = st.columns([1, 1.2, 1, 3])
     with t1:
-        if st.button("➕ Add New Site", use_container_width=True, type="primary"):
+        if st.button("➕ Add New", use_container_width=True, type="primary"):
             st.session_state.show_form = not st.session_state.get('show_form', False)
 
-    # Fetch Data
-    raw_res = fetch_table("indus_data")
-    df_m = pd.DataFrame(raw_res)
+    df_m = pd.DataFrame(fetch_table("indus_data"))
 
     if not df_m.empty:
-        # SEARCH FILTER
+        # Search & Filter
         search = t4.text_input("", placeholder="🔍 Search...", label_visibility="collapsed")
         df_f = df_m[df_m.astype(str).apply(lambda x: x.str.contains(search, case=False)).any(axis=1)] if search else df_m
         
-        # PAGINATION
-        pg_size = 5
-        tot_pgs = max(1, (len(df_f) // pg_size) + (1 if len(df_f) % pg_size > 0 else 0))
-        curr_pg = st.number_input("Page", 1, tot_pgs, 1)
-
-        # TABLE CSS
+        # Table Styling
         st.markdown("""
             <style>
-            .scroll-view { width: 100%; overflow-x: auto; border: 1px solid #eee; border-radius: 10px; margin-bottom: 20px; }
-            .vision-table { width: 100%; border-collapse: collapse; min-width: 2500px; }
-            .vision-table th { background-color: #1E60D5; color: white; padding: 12px; text-align: left; }
-            .vision-table td { padding: 12px; border-bottom: 1px solid #f0f0f0; font-size: 13px; background: white; }
+            .unified-wrapper { width: 100%; overflow-x: auto; border: 1px solid #ddd; border-radius: 8px; }
+            .vision-table { width: 100%; border-collapse: collapse; min-width: 2800px; }
+            .vision-table th { background-color: #1E60D5; color: white; padding: 12px; text-align: left; position: sticky; top: 0; }
+            .vision-table td { padding: 10px; border-bottom: 1px solid #eee; font-size: 13px; background: white; }
+            .action-col { width: 120px; text-align: center; background: #f8f9fa !important; position: sticky; left: 0; z-index: 5; border-right: 2px solid #ddd !important; }
             </style>
         """, unsafe_allow_html=True)
 
+        # Pagination
+        pg_size = 5
+        tot_pgs = max(1, (len(df_f) // pg_size) + (1 if len(df_f) % pg_size > 0 else 0))
+        curr_pg = st.number_input("Page", 1, tot_pgs, 1)
+        
         st.write("---")
+        
+        # --- START UNIFIED TABLE CONSTRUCTION ---
+        def fmt(v): 
+            try: return f"₹{float(v):,.2f}" if not pd.isna(v) else "₹0.00"
+            except: return "₹0.00"
 
-        # --- DATA ROWS LOOP ---
+        # We must use Streamlit columns for the buttons to work, 
+        # but we'll align them to look like they are part of the table.
         for i, row in df_f.iloc[(curr_pg-1)*pg_size : curr_pg*pg_size].iterrows():
-            # KEY FIX: Agar 'id' nahi mila toh index 'i' use karein buttons ke liye
-            # Lekin delete/edit ke liye asli ID chahiye, isliye .get use karenge
             db_id = row.get('id') if row.get('id') else row.get('ID', i)
-            p_id_display = row.get('Project ID', 'N/A')
+            p_id = row.get('Project ID', 'N/A')
 
-            # Buttons Row (Strictly Start of the Line)
-            b1, b2, b3, info = st.columns([0.4, 0.4, 0.4, 8])
+            # Row Layout: Buttons (left) + Data (right)
+            # This ensures teeno buttons starting mein hi rahein
+            btn1, btn2, btn3, data_area = st.columns([0.4, 0.4, 0.4, 10])
             
-            if b1.button("✏️", key=f"edit_btn_{db_id}_{i}"):
-                edit_modal(row)
+            if btn1.button("✏️", key=f"e_{db_id}_{i}"): edit_modal(row)
+            if btn2.button("💰", key=f"p_{db_id}_{i}"): st.toast(f"Finance for {p_id}")
+            if btn3.button("🗑️", key=f"d_{db_id}_{i}"): delete_modal(db_id, p_id)
             
-            if b2.button("💰", key=f"pay_btn_{db_id}_{i}"):
-                st.toast(f"Finance Link for {p_id_display}")
-            
-            if b3.button("🗑️", key=f"del_btn_{db_id}_{i}"):
-                delete_modal(db_id, p_id_display)
-            
-            info.markdown(f"**Project ID:** `{p_id_display}` | **Site:** {row.get('Site Name','-')}")
-
-            # Horizontal Scrollable Data
-            def fmt(v): 
-                try: return f"₹{float(v):,.2f}" if not pd.isna(v) else "₹0.00"
-                except: return "₹0.00"
-
-            table_html = f"""
-            <div class="scroll-view">
+            # The Data part for this specific row in a scrollable div
+            row_html = f"""
+            <div class="unified-wrapper">
                 <table class="vision-table">
                     <tr>
-                        <th>Project</th><th>Site ID</th><th>Cluster</th><th>PO Number</th>
-                        <th>Projected Amt</th><th>Status</th><th>Team Billing</th>
-                        <th>Team Paid</th><th>Team Balance</th><th>VIS Inv No</th>
-                        <th>VIS Bill Amt</th><th>VIS Rec Amt</th><th>VIS Balance</th>
-                    </tr>
-                    <tr>
-                        <td>{row.get('Project','-')}</td><td>{row.get('Site ID','-')}</td>
-                        <td>{row.get('Cluster','-')}</td><td>{row.get('PO Number','-')}</td>
-                        <td>{fmt(row.get('Projected Amount'))}</td><td>{row.get('Site Status','-')}</td>
-                        <td>{fmt(row.get('Team Billing'))}</td><td>{fmt(row.get('Team paid Amount'))}</td>
-                        <td style="color:red; font-weight:bold;">{fmt(row.get('Team Balance'))}</td>
-                        <td>{row.get('VIS Invoice No.','-')}</td><td>{fmt(row.get('VIS Bill Amount'))}</td>
-                        <td>{fmt(row.get('VIS Received Amt'))}</td>
-                        <td style="color:orange; font-weight:bold;">{fmt(row.get('VIS Balance'))}</td>
+                        <td style="width:200px"><b>{p_id}</b></td>
+                        <td style="width:150px">{row.get('Project','-')}</td>
+                        <td style="width:150px">{row.get('Site ID','-')}</td>
+                        <td style="width:200px">{row.get('Site Name','-')}</td>
+                        <td style="width:150px">{row.get('Cluster','-')}</td>
+                        <td style="width:150px">{row.get('PO Number','-')}</td>
+                        <td style="width:150px">{fmt(row.get('Projected Amount'))}</td>
+                        <td style="width:120px">{row.get('Site Status','-')}</td>
+                        <td style="width:150px">{fmt(row.get('Team Billing'))}</td>
+                        <td style="width:150px">{fmt(row.get('Team paid Amount'))}</td>
+                        <td style="width:150px; color:red; font-weight:bold;">{fmt(row.get('Team Balance'))}</td>
+                        <td style="width:150px">{row.get('VIS Invoice No.','-')}</td>
+                        <td style="width:150px">{fmt(row.get('VIS Bill Amount'))}</td>
+                        <td style="width:150px">{fmt(row.get('VIS Received Amt'))}</td>
+                        <td style="width:150px; color:orange; font-weight:bold;">{fmt(row.get('VIS Balance'))}</td>
                     </tr>
                 </table>
             </div>
             """
-            st.markdown(table_html, unsafe_allow_html=True)
-            
+            data_area.markdown(row_html, unsafe_allow_html=True)
+            st.write("") # Minimal spacing
+
     else:
-        st.info("No data found. Click 'Add New' to start.")
+        st.info("No data found.")
 # ================= 💰 FINANCE (UNCHANGED) =================
 elif menu == "💰 Finance":
     st.title("💰 Finance Entry")
