@@ -94,14 +94,15 @@ if menu == "📊 Dashboard":
     else:
         st.info("No data found in the database.")
 
-# ================= 📁 PROJECT MANAGEMENT (STRICT HORIZONTAL TABLE) =================
+# ================= 📁 PROJECT MANAGEMENT (TRUE HORIZONTAL TABLE) =================
 elif menu == "📁 Project Management":
     st.title("📁 Project Management Portal")
 
+    # Session states
     if "edit_id" not in st.session_state: st.session_state.edit_id = None
     if "show_form" not in st.session_state: st.session_state.show_form = False
 
-    # Toolbar
+    # --- TOOLBAR (Add, Upload, Download, Search) ---
     t1, t2, t3, t4 = st.columns([1, 1.2, 1, 3])
     with t1:
         if st.button("➕ Add New", use_container_width=True, type="primary"):
@@ -109,7 +110,7 @@ elif menu == "📁 Project Management":
             st.session_state.edit_id = None
             st.rerun()
     with t2:
-        bulk = st.file_uploader("Bulk", type=['xlsx'], label_visibility="collapsed")
+        bulk = st.file_uploader("Bulk Upload", type=['xlsx'], label_visibility="collapsed")
     
     df_m = pd.DataFrame(fetch_table("indus_data"))
     
@@ -118,110 +119,139 @@ elif menu == "📁 Project Management":
             out = BytesIO()
             with pd.ExcelWriter(out, engine='xlsxwriter') as wr:
                 df_m.to_excel(wr, index=False)
-            st.download_button("📥 Download", out.getvalue(), "Vision_Master.xlsx", use_container_width=True)
+            st.download_button("📥 Download Excel", out.getvalue(), "Vision_Master.xlsx", use_container_width=True)
     with t4:
-        search = st.text_input("", placeholder="🔍 Search...", label_visibility="collapsed")
+        search = st.text_input("", placeholder="🔍 Search anything...", label_visibility="collapsed")
 
-    # Form (Add/Edit) logic stays same as before...
-    # [Insert Form Code Here if needed]
+    # --- CSS FOR REAL HORIZONTAL SCROLL ---
+    st.markdown("""
+        <style>
+        .table-wrapper {
+            width: 100%;
+            overflow-x: auto; /* This enables the horizontal scroll */
+            border: 1px solid #e6e9ef;
+            border-radius: 10px;
+        }
+        .modern-table {
+            width: 100%;
+            border-collapse: collapse;
+            min-width: 2800px; /* Forces the table to stay wide */
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        .modern-table th {
+            background-color: #1E60D5;
+            color: white;
+            padding: 15px;
+            text-align: left;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+        .modern-table td {
+            padding: 12px;
+            border-bottom: 1px solid #f0f2f6;
+            font-size: 14px;
+            color: #31333F;
+        }
+        .modern-table tr:hover { background-color: #f8f9fb; }
+        .btn-link {
+            text-decoration: none;
+            color: #1E60D5;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        </style>
+    """, unsafe_allow_html=True)
 
-    # --- THE ACTUAL TABLE ---
+    # --- TABLE LOGIC ---
     if not df_m.empty:
         # Search filter
         df_f = df_m[df_m.astype(str).apply(lambda x: x.str.contains(search, case=False)).any(axis=1)] if search else df_m
         
-        # Table Styling for Horizontal Scroll
-        st.markdown("""
-            <style>
-            .scroll-container {
-                width: 100%;
-                overflow-x: auto;
-                border: 1px solid #ddd;
-                border-radius: 10px;
-            }
-            .modern-table {
-                width: 100%;
-                border-collapse: collapse;
-                min-width: 2000px; /* Force scroll */
-                font-family: sans-serif;
-            }
-            .modern-table th {
-                background-color: #1E60D5;
-                color: white;
-                padding: 12px;
-                text-align: left;
-                position: sticky;
-                top: 0;
-            }
-            .modern-table td {
-                padding: 10px;
-                border-bottom: 1px solid #eee;
-                font-size: 13px;
-            }
-            .modern-table tr:hover { background-color: #f9f9f9; }
-            </style>
-        """, unsafe_allow_html=True)
-
         # Pagination
         pg_size = 5
         tot_pgs = max(1, (len(df_f) // pg_size) + (1 if len(df_f) % pg_size > 0 else 0))
         curr_pg = st.number_input("Page", 1, tot_pgs, 1)
 
-        # Table Header
-        html_code = """
-        <div class="scroll-container">
+        # Start Table HTML
+        html_table = f"""
+        <div class="table-wrapper">
             <table class="modern-table">
                 <tr>
-                    <th>Project ID</th><th>Project</th><th>Site ID</th><th>Site Name</th>
-                    <th>Cluster</th><th>PO Number</th><th>Projected Amt</th><th>Team Name</th>
-                    <th>Status</th><th>Team Billing</th><th>Team Paid</th><th>Team Bal</th>
-                    <th>VIS Inv No</th><th>VIS Inv Date</th><th>VIS Bill Amt</th><th>VIS Rec Amt</th><th>VIS Balance</th>
+                    <th>Actions</th>
+                    <th>Project ID</th>
+                    <th>Project</th>
+                    <th>Site ID</th>
+                    <th>Site Name</th>
+                    <th>Cluster</th>
+                    <th>PO Number</th>
+                    <th>Projected Amt</th>
+                    <th>Team Name</th>
+                    <th>Status</th>
+                    <th>Team Billing</th>
+                    <th>Team Paid</th>
+                    <th>Team Balance</th>
+                    <th>VIS Inv No</th>
+                    <th>VIS Inv Date</th>
+                    <th>VIS Bill Amt</th>
+                    <th>VIS Rec Amt</th>
+                    <th>VIS Balance</th>
                 </tr>
         """
 
-        # Table Body
+        # Fill Table Rows
         for i, row in df_f.iloc[(curr_pg-1)*pg_size : curr_pg*pg_size].iterrows():
-            html_code += f"""
+            rid = row.get('id', i)
+            html_table += f"""
                 <tr>
+                    <td>
+                        <a href="?edit={rid}">✏️</a> | 
+                        <a href="?pay={rid}">💰</a> | 
+                        <a href="?del={rid}">🗑️</a>
+                    </td>
                     <td><b>{row.get('Project ID','-')}</b></td>
                     <td>{row.get('Project','-')}</td>
                     <td>{row.get('Site ID','-')}</td>
                     <td>{row.get('Site Name','-')}</td>
                     <td>{row.get('Cluster','-')}</td>
                     <td>{row.get('PO Number','-')}</td>
-                    <td>₹{row.get('Projected Amount',0)}</td>
+                    <td>₹{row.get('Projected Amount',0):,.2f}</td>
                     <td>{row.get('Team Name','-')}</td>
                     <td>{row.get('Site Status','-')}</td>
-                    <td>₹{row.get('Team Billing',0)}</td>
-                    <td>₹{row.get('Team paid Amount',0)}</td>
-                    <td style="color:red">₹{row.get('Team Balance',0)}</td>
+                    <td>₹{row.get('Team Billing',0):,.2f}</td>
+                    <td>₹{row.get('Team paid Amount',0):,.2f}</td>
+                    <td style="color:red; font-weight:bold;">₹{row.get('Team Balance',0):,.2f}</td>
                     <td>{row.get('VIS Invoice No.','-')}</td>
                     <td>{row.get('VIS Invoice Date','-')}</td>
-                    <td>₹{row.get('VIS Bill Amount',0)}</td>
-                    <td>₹{row.get('VIS Received Amt',0)}</td>
-                    <td style="color:orange">₹{row.get('VIS Balance',0)}</td>
+                    <td>₹{row.get('VIS Bill Amount',0):,.2f}</td>
+                    <td>₹{row.get('VIS Received Amt',0):,.2f}</td>
+                    <td style="color:orange; font-weight:bold;">₹{row.get('VIS Balance',0):,.2f}</td>
                 </tr>
             """
         
-        html_code += "</table></div>"
-        st.markdown(html_code, unsafe_allow_html=True)
+        html_table += "</table></div>"
+        st.markdown(html_table, unsafe_allow_html=True)
 
-        # Action Buttons (✏️, 💰, 🗑️) separately below the table for current page
-        st.write("### Actions for visible rows:")
-        for i, row in df_f.iloc[(curr_pg-1)*pg_size : curr_pg*pg_size].iterrows():
-            rid = row.get('id', i)
-            cols = st.columns([0.5, 0.5, 0.5, 8])
-            if cols[0].button("✏️", key=f"e_{rid}"):
-                st.session_state.edit_id = rid
-                st.session_state.show_form = True
-                st.rerun()
-            if cols[1].button("💰", key=f"p_{rid}"): st.toast(f"Pay {row['Project ID']}")
-            if cols[2].button("🗑️", key=f"d_{rid}"):
-                delete_row("indus_data", rid)
-                st.rerun()
-            cols[3].write(f"Actions for ID: **{row['Project ID']}**")
+        # --- FOOTER ACTIONS ---
+        # Since HTML links inside Markdown can't trigger Python functions easily, 
+        # we keep a small button set here for the actual logic.
+        st.write("---")
+        action_col = st.columns([2, 2, 2, 4])
+        target_id = action_col[0].selectbox("Select ID to Edit/Delete", df_f['Project ID'].iloc[(curr_pg-1)*pg_size : curr_pg*pg_size])
+        
+        if action_col[1].button("✏️ Edit Selected"):
+            target_row = df_f[df_f['Project ID'] == target_id].iloc[0]
+            st.session_state.edit_id = target_row['id']
+            st.session_state.show_form = True
+            st.rerun()
+            
+        if action_col[2].button("🗑️ Delete Selected"):
+            target_row = df_f[df_f['Project ID'] == target_id].iloc[0]
+            delete_row("indus_data", target_row['id'])
+            st.rerun()
+
     else:
-        st.info("No data available.")
+        st.info("No data available. Click 'Add New' to start.")
 # ================= 💰 FINANCE (UNCHANGED) =================
 elif menu == "💰 Finance":
     st.title("💰 Finance Entry")
