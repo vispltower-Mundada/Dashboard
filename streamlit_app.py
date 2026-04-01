@@ -173,13 +173,17 @@ elif menu == "📁 Project Management":
                     st.rerun()
 
     # --- 2. HANDLE URL PARAMS (TRIGGER POP-UPS) ---
-    if "edit_id" in st.query_params:
+if "edit_id" in st.query_params:
         rid = int(st.query_params["edit_id"])
+        
+        # URL clean karein taaki refresh par wapas na khule, par page Project hi rahe
         st.query_params.clear()
         st.query_params["menu"] = "Project"
+        
+        # Jis line par click kiya hai, uska data dhundh kar form mein pass karein
         ed_row = df_m[df_m['id'] == rid]
         if not ed_row.empty:
-            project_form_modal(ed_row.iloc[0])
+            project_form_modal(ed_row.iloc[0]) # Yeh line same 'Add New' jaisa form pre-filled kholegi
 
     if "del_id" in st.query_params:
         rid = int(st.query_params["del_id"])
