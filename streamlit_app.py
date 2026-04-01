@@ -239,19 +239,80 @@ elif menu == "📁 Project Management":
             except: return "₹0.00"
 
         html_code = """
-        <style>
-        .scroll-container { width: 100%; overflow-x: auto; border-radius: 10px; border: 1px solid #ddd; background: white; margin-top: 15px; box-shadow: 0 4px 10px rgba(0,0,0,0.05); }
-        .data-table { width: 100%; border-collapse: collapse; min-width: 2800px; font-family: sans-serif; }
-        .data-table th { background: #1E60D5; color: white; padding: 12px; text-align: left; position: sticky; top: 0; z-index: 2; font-size: 14px; }
-        .data-table td { padding: 12px; border-bottom: 1px solid #eee; font-size: 13px; color: #333; }
+       <style>
+        .scroll-container { 
+            width: 100%; 
+            overflow-x: auto; 
+            border-radius: 10px; 
+            border: 1px solid #ddd; 
+            background: white; 
+            margin-top: 15px; 
+            box-shadow: 0 4px 10px rgba(0,0,0,0.05); 
+            position: relative;
+        }
+        .data-table { 
+            width: 100%; 
+            border-collapse: collapse; 
+            min-width: 2800px; 
+            font-family: sans-serif; 
+        }
+        .data-table th { 
+            background: #1E60D5; 
+            color: white; 
+            padding: 12px; 
+            text-align: left; 
+            position: sticky; 
+            top: 0; 
+            z-index: 10; /* Lower than action header */
+            font-size: 14px; 
+        }
+        .data-table td { 
+            padding: 12px; 
+            border-bottom: 1px solid #eee; 
+            font-size: 13px; 
+            color: #333; 
+        }
         .data-table tr:hover { background: #f8f9fa; }
         
-        /* FIX: Z-index badhaya gaya hai taaki buttons click ho sakein */
-        .sticky-action { position: sticky; left: 0; background: #f4f6f9 !important; z-index: 99 !important; border-right: 2px solid #ddd !important; text-align: center; }
-        .sticky-action-header { position: sticky; left: 0; z-index: 100 !important; background: #1E60D5 !important; border-right: 2px solid #144ba6 !important; text-align: center; }
-        .btn-icon { text-decoration: none; font-size: 18px; margin: 0 8px; cursor: pointer; display: inline-block; position: relative; z-index: 101; }
+        /* 🚨 FIX: ACTION COLUMN Z-INDEX & CLICKABILITY 🚨 */
+        .sticky-action { 
+            position: sticky; 
+            left: 0; 
+            background: #f4f6f9 !important; 
+            z-index: 50 !important; /* Forces it above other columns */
+            border-right: 2px solid #ddd !important; 
+            text-align: center; 
+        }
+        .sticky-action-header { 
+            position: sticky; 
+            left: 0; 
+            z-index: 100 !important; /* Highest priority */
+            background: #1E60D5 !important; 
+            border-right: 2px solid #144ba6 !important; 
+            text-align: center; 
+        }
+        .btn-icon { 
+            text-decoration: none; 
+            font-size: 18px; 
+            margin: 0 8px; 
+            cursor: pointer; 
+            position: relative; 
+            z-index: 200 !important; /* Ensures the icon itself is clickable */
+            pointer-events: auto !important; /* Forces click events to register */
+            display: inline-block;
+        }
+        .btn-icon:hover {
+            transform: scale(1.1);
+        }
         
-        .status-badge { background: #e3f2fd; color: #1e88e5; padding: 4px 8px; border-radius: 12px; font-weight: bold; font-size: 11px; }
+        .status-badge { 
+            background: #e3f2fd; 
+            color: #1e88e5; 
+            padding: 4px 8px; 
+            border-radius: 12px; 
+            font-weight: bold; 
+            font-size: 11px; 
+        }
         </style>
         <div class="scroll-container">
             <table class="data-table">
