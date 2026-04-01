@@ -248,11 +248,14 @@ elif menu == "📁 Project Management":
             background: white; 
             margin-top: 15px; 
             box-shadow: 0 4px 10px rgba(0,0,0,0.05); 
-            position: relative;
+            position: relative; 
+            z-index: 10; 
         }
+        /* FIX 1: 'collapse' ki jagah 'separate' use karna zaroori hai sticky clicks ke liye */
         .data-table { 
             width: 100%; 
-            border-collapse: collapse; 
+            border-collapse: separate; 
+            border-spacing: 0; 
             min-width: 2800px; 
             font-family: sans-serif; 
         }
@@ -263,8 +266,9 @@ elif menu == "📁 Project Management":
             text-align: left; 
             position: sticky; 
             top: 0; 
-            z-index: 10; /* Lower than action header */
+            z-index: 20; 
             font-size: 14px; 
+            border-bottom: 1px solid #eee;
         }
         .data-table td { 
             padding: 12px; 
@@ -272,48 +276,41 @@ elif menu == "📁 Project Management":
             font-size: 13px; 
             color: #333; 
         }
-        .data-table tr:hover { background: #f8f9fa; }
+        .data-table tr:hover td { background: #f8f9fa; }
         
-        /* 🚨 FIX: ACTION COLUMN Z-INDEX & CLICKABILITY 🚨 */
+        /* FIX 2: Actions column ko sabse upar laane ke liye Z-index 999 */
         .sticky-action { 
             position: sticky; 
             left: 0; 
             background: #f4f6f9 !important; 
-            z-index: 50 !important; /* Forces it above other columns */
+            z-index: 999 !important; 
             border-right: 2px solid #ddd !important; 
             text-align: center; 
         }
         .sticky-action-header { 
             position: sticky; 
             left: 0; 
-            z-index: 100 !important; /* Highest priority */
+            z-index: 1000 !important; 
             background: #1E60D5 !important; 
             border-right: 2px solid #144ba6 !important; 
             text-align: center; 
         }
+        
+        /* FIX 3: Buttons ko strictly clickable banane ke liye pointer-events aur high Z-index */
         .btn-icon { 
             text-decoration: none; 
             font-size: 18px; 
-            margin: 0 8px; 
+            margin: 0 6px; 
             cursor: pointer; 
             position: relative; 
-            z-index: 200 !important; /* Ensures the icon itself is clickable */
-            pointer-events: auto !important; /* Forces click events to register */
-            display: inline-block;
+            z-index: 9999 !important; 
+            pointer-events: auto !important; 
+            display: inline-block; 
         }
-        .btn-icon:hover {
-            transform: scale(1.1);
-        }
-        
-        .status-badge { 
-            background: #e3f2fd; 
-            color: #1e88e5; 
-            padding: 4px 8px; 
-            border-radius: 12px; 
-            font-weight: bold; 
-            font-size: 11px; 
-        }
+        .btn-icon:hover { transform: scale(1.2); }
+        .status-badge { background: #e3f2fd; color: #1e88e5; padding: 4px 8px; border-radius: 12px; font-weight: bold; font-size: 11px; }
         </style>
+        
         <div class="scroll-container">
             <table class="data-table">
                 <tr>
@@ -329,12 +326,13 @@ elif menu == "📁 Project Management":
             db_id = row.get('id') if row.get('id') else row.get('ID', i)
             p_id = row.get('Project ID', 'N/A')
             
+            # FIX 4: target="_self" taaki click Streamlit ke URL system se safely interact kare
             html_code += f"""
                 <tr>
                     <td class="sticky-action">
-                        <a href="?menu=Project&edit_id={db_id}" target="_parent" class="btn-icon">✏️</a>
-                        <a href="?menu=Project&pay_id={p_id}" target="_parent" class="btn-icon">💰</a>
-                        <a href="?menu=Project&del_id={db_id}" target="_parent" class="btn-icon">🗑️</a>
+                        <a href="?menu=Project&edit_id={db_id}" target="_self" class="btn-icon" title="Edit">✏️</a>
+                        <a href="?menu=Project&pay_id={p_id}" target="_self" class="btn-icon" title="Pay">💰</a>
+                        <a href="?menu=Project&del_id={db_id}" target="_self" class="btn-icon" title="Delete">🗑️</a>
                     </td>
                     <td style="font-weight:bold; color:#1E60D5;">{p_id}</td>
                     <td>{row.get('Project','-')}</td>
@@ -358,10 +356,7 @@ elif menu == "📁 Project Management":
         html_code += "</table></div>"
         
         st.markdown(html_code.replace('\n', ''), unsafe_allow_html=True)
-
-    else:
-        st.info("No projects found.")
-
+        
 
 # ================= 3. 💰 FINANCE =================
 elif menu == "💰 Finance":
