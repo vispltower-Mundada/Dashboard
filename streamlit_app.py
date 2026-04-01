@@ -98,13 +98,11 @@ if menu == "📊 Dashboard":
 elif menu == "📁 Project Management":
     st.title("📁 Project Master List")
 
-    # Data pehle fetch karenge taaki Duplicate check aur Table dono mein kaam aaye
     df_m = pd.DataFrame(fetch_table("indus_data"))
 
     # --- 1. POP-UP DIALOG FOR ADD/EDIT (3 STEPS FORMAT) ---
     @st.dialog("📝 Project Details Form", width="large")
     def project_form_modal(ed=None):
-        # Prevent Duplicate Project ID logic
         existing_pids = df_m['Project ID'].dropna().astype(str).tolist() if not df_m.empty else []
         if ed is not None and str(ed.get('Project ID')) in existing_pids:
             existing_pids.remove(str(ed.get('Project ID')))
@@ -113,11 +111,9 @@ elif menu == "📁 Project Management":
             # ---------------- STEP 1: SITE DETAILS ----------------
             st.markdown("### 📍 1. Site Details")
             c1, c2, c3 = st.columns(3)
-            
             p_opts = ["Airtel", "Jio", "VIL", "O&M"]
             p_val = str(ed.get('Project', 'Airtel')) if ed else "Airtel"
             p_type = c1.selectbox("Project", p_opts, index=p_opts.index(p_val) if p_val in p_opts else 0)
-            
             p_id = c2.text_input("Project ID (Must be Unique) *", value=str(ed.get('Project ID', '')) if ed else "")
             s_id = c3.text_input("Site ID", value=str(ed.get('Site ID', '')) if ed else "")
             
@@ -131,20 +127,17 @@ elif menu == "📁 Project Management":
             # ---------------- STEP 2: TEAM DETAILS ----------------
             st.markdown("### 👥 2. Team Details")
             c7, c8 = st.columns(2)
-            
             t_opts = ["Team A", "Team B", "Team C", "Team D"]
             t_val = str(ed.get('Team Name', 'Team A')) if ed else "Team A"
             t_name = c7.selectbox("Team Name", t_opts, index=t_opts.index(t_val) if t_val in t_opts else 0)
             
-            sts_opts = ["Pending", "Ongoing", "Completed"]
+            sts_opts = ["Pending", "Ongoing", "Completed", "Done", "Yet to Start"]
             sts_val = str(ed.get('Site Status', 'Pending')) if ed else "Pending"
             sts = c8.selectbox("Site Status", sts_opts, index=sts_opts.index(sts_val) if sts_val in sts_opts else 0)
 
             c9, c10 = st.columns(2)
             t_bill = c9.number_input("Team Billing", value=float(ed.get('Team Billing', 0)) if ed else 0.0)
             t_paid = c10.number_input("Team Paid Amount", value=float(ed.get('Team paid Amount', 0)) if ed else 0.0)
-            
-            # Auto-calculate display for User (Logic safe)
             st.info(f"**Team Balance (Auto-calculated):** ₹ {t_bill - t_paid:,.2f}")
 
             # ---------------- STEP 3: VIS BILLING DETAILS ----------------
@@ -156,13 +149,9 @@ elif menu == "📁 Project Management":
             c13, c14 = st.columns(2)
             v_amt = c13.number_input("VIS Bill Amount", value=float(ed.get('VIS Bill Amount', 0)) if ed else 0.0)
             v_rec = c14.number_input("VIS Received Amt", value=float(ed.get('VIS Received Amt', 0)) if ed else 0.0)
-            
-            # Auto-calculate display for User
             st.info(f"**VIS Balance (Auto-calculated):** ₹ {v_amt - v_rec:,.2f}")
 
             st.divider()
-            
-            # --- SUBMIT & LOGIC ---
             if st.form_submit_button("💾 Save Project Data", use_container_width=True):
                 if not p_id.strip():
                     st.error("❌ Project ID is required!")
@@ -183,14 +172,14 @@ elif menu == "📁 Project Management":
                         insert_row("indus_data", payload)
                     st.rerun()
 
-    # --- 2. HANDLE ACTION CLICKS (URL QUERY PARAMS) ---
+    # --- 2. HANDLE URL PARAMS (TRIGGER POP-UPS) ---
     if "edit_id" in st.query_params:
         rid = int(st.query_params["edit_id"])
         st.query_params.clear()
         st.query_params["menu"] = "Project"
         ed_row = df_m[df_m['id'] == rid]
         if not ed_row.empty:
-            project_form_modal(ed_row.iloc[0]) # Trigger the Pop-up with data
+            project_form_modal(ed_row.iloc[0])
 
     if "del_id" in st.query_params:
         rid = int(st.query_params["del_id"])
@@ -199,10 +188,14 @@ elif menu == "📁 Project Management":
         delete_row("indus_data", rid)
         st.rerun()
 
+    if "pay_id" in st.query_params:
+        st.toast(f"Finance module for Project {st.query_params['pay_id']} coming soon!")
+        st.query_params.clear()
+        st.query_params["menu"] = "Project"
+
     # --- 3. TOP TOOLBAR ---
     t1, t2, t3, t4 = st.columns([1, 1.2, 1, 3])
     with t1:
-        # Jab button click hoga tab Pop-up khulega
         if st.button("➕ Add New Site", use_container_width=True, type="primary"):
             project_form_modal()
             
@@ -220,7 +213,76 @@ elif menu == "📁 Project Management":
         search = st.text_input("", placeholder="🔍 Search Site, ID or Team...", label_visibility="collapsed")
 
     # --- 4. LAVISH TABLE WITH SCROLLER (NO CODE LEAKS) ---
-    # (Aapka Lavish table wala code yahan se start hoga. Ise delete/change Mtt kariyega)
+    if not df_m.empty:
+        df_f = df_m[df_m.astype(str).apply(lambda x: x.str.contains(search, case=False)).any(axis=1)] if search else df_m
+        
+        pg_size = 10
+        tot_pgs = max(1, (len(df_f) // pg_size) + (1 if len(df_f) % pg_size > 0 else 0))
+        curr_pg = st.number_input("Page", 1, tot_pgs, 1)
+
+        def clean_val(val):
+            try: return f"₹{float(val):,.2f}" if not pd.isna(val) else "₹0.00"
+            except: return "₹0.00"
+
+        html_code = """
+        <style>
+        .scroll-container { width: 100%; overflow-x: auto; border-radius: 10px; border: 1px solid #ddd; background: white; margin-top: 15px; box-shadow: 0 4px 10px rgba(0,0,0,0.05); }
+        .data-table { width: 100%; border-collapse: collapse; min-width: 2800px; font-family: sans-serif; }
+        .data-table th { background: #1E60D5; color: white; padding: 12px; text-align: left; position: sticky; top: 0; z-index: 2; font-size: 14px; }
+        .data-table td { padding: 12px; border-bottom: 1px solid #eee; font-size: 13px; color: #333; }
+        .data-table tr:hover { background: #f8f9fa; }
+        .sticky-action { position: sticky; left: 0; background: #f4f6f9 !important; z-index: 1; border-right: 2px solid #ddd !important; text-align: center; }
+        .sticky-action-header { position: sticky; left: 0; z-index: 3 !important; background: #1E60D5 !important; border-right: 2px solid #144ba6 !important; text-align: center; }
+        .btn-icon { text-decoration: none; font-size: 16px; margin: 0 6px; }
+        .status-badge { background: #e3f2fd; color: #1e88e5; padding: 4px 8px; border-radius: 12px; font-weight: bold; font-size: 11px; }
+        </style>
+        <div class="scroll-container">
+            <table class="data-table">
+                <tr>
+                    <th class="sticky-action-header">Actions</th>
+                    <th>Project ID</th><th>Project</th><th>Site ID</th><th>Site Name</th>
+                    <th>Cluster</th><th>PO Number</th><th>Projected Amt</th><th>Status</th>
+                    <th>Team Billing</th><th>Team Paid</th><th>Team Balance</th>
+                    <th>VIS Inv No</th><th>VIS Inv Date</th><th>VIS Bill Amt</th><th>VIS Rec Amt</th><th>VIS Balance</th>
+                </tr>
+        """
+
+        for i, row in df_f.iloc[(curr_pg-1)*pg_size : curr_pg*pg_size].iterrows():
+            db_id = row.get('id') if row.get('id') else row.get('ID', i)
+            p_id = row.get('Project ID', 'N/A')
+            
+            html_code += f"""
+                <tr>
+                    <td class="sticky-action">
+                        <a href="?menu=Project&edit_id={db_id}" target="_parent" class="btn-icon">✏️</a>
+                        <a href="?menu=Project&pay_id={p_id}" target="_parent" class="btn-icon">💰</a>
+                        <a href="?menu=Project&del_id={db_id}" target="_parent" class="btn-icon">🗑️</a>
+                    </td>
+                    <td style="font-weight:bold; color:#1E60D5;">{p_id}</td>
+                    <td>{row.get('Project','-')}</td>
+                    <td>{row.get('Site ID','-')}</td>
+                    <td>{row.get('Site Name','-')}</td>
+                    <td>{row.get('Cluster','-')}</td>
+                    <td>{row.get('PO Number','-')}</td>
+                    <td>{clean_val(row.get('Projected Amount'))}</td>
+                    <td><span class="status-badge">{row.get('Site Status','-')}</span></td>
+                    <td>{clean_val(row.get('Team Billing'))}</td>
+                    <td>{clean_val(row.get('Team paid Amount'))}</td>
+                    <td style="color:#d32f2f; font-weight:bold;">{clean_val(row.get('Team Balance'))}</td>
+                    <td>{row.get('VIS Invoice No.','-')}</td>
+                    <td>{row.get('VIS Invoice Date','-')}</td>
+                    <td>{clean_val(row.get('VIS Bill Amt'))}</td>
+                    <td>{clean_val(row.get('VIS Received Amt'))}</td>
+                    <td style="color:#f57c00; font-weight:bold;">{clean_val(row.get('VIS Balance'))}</td>
+                </tr>
+            """
+        
+        html_code += "</table></div>"
+        
+        st.markdown(html_code.replace('\n', ''), unsafe_allow_html=True)
+
+    else:
+        st.info("No projects found.")
 
 
 # ================= 3. 💰 FINANCE =================
