@@ -132,30 +132,46 @@ elif menu == "📁 Project Management":
         tot_pgs = max(1, (len(df_f) // pg_size) + (1 if len(df_f) % pg_size > 0 else 0))
         curr_pg = st.number_input("Page", 1, tot_pgs, 1)
         
-        # Build HTML String
-        table_rows = ""
-        for _, row in df_f.iloc[(curr_pg-1)*pg_size : curr_pg*pg_size].iterrows():
-            table_rows += f"""
-            <tr>
-                <td><b>{row.get('Project ID','-')}</b></td>
-                <td>{row.get('Project','-')}</td>
-                <td>{row.get('Site ID','-')}</td>
-                <td>{row.get('Site Name','-')}</td>
-                <td>{row.get('Cluster','-')}</td>
-                <td>{row.get('PO Number','-')}</td>
-                <td>₹{row.get('Projected Amount',0):,.2f}</td>
-                <td>{row.get('Team Name','-')}</td>
-                <td>{row.get('Site Status','-')}</td>
-                <td>₹{row.get('Team Billing',0):,.2f}</td>
-                <td>₹{row.get('Team paid Amount',0):,.2f}</td>
-                <td style="color:red; font-weight:bold;">₹{row.get('Team Balance',0):,.2f}</td>
-                <td>{row.get('VIS Invoice No.','-')}</td>
-                <td>{row.get('VIS Invoice Date','-')}</td>
-                <td>₹{row.get('VIS Bill Amount',0):,.2f}</td>
-                <td>₹{row.get('VIS Received Amt',0):,.2f}</td>
-                <td style="color:orange; font-weight:bold;">₹{row.get('VIS Balance',0):,.2f}</td>
-            </tr>
-            """
+# Build HTML String
+table_rows = ""
+for _, row in df_f.iloc[(curr_pg-1)*pg_size : curr_pg*pg_size].iterrows():
+    # --- CLEANING VALUES (Fix for ₹nan) ---
+    def clean_val(val):
+        try:
+            v = float(val)
+            return 0.0 if pd.isna(v) else v
+        except:
+            return 0.0
+
+    p_amt = clean_val(row.get('Projected Amount'))
+    t_bill = clean_val(row.get('Team Billing'))
+    t_paid = clean_val(row.get('Team paid Amount'))
+    t_bal = clean_val(row.get('Team Balance'))
+    v_bill = clean_val(row.get('VIS Bill Amount'))
+    v_rec = clean_val(row.get('VIS Received Amt'))
+    v_bal = clean_val(row.get('VIS Balance'))
+
+    table_rows += f"""
+    <tr>
+        <td><b>{row.get('Project ID','-')}</b></td>
+        <td>{row.get('Project','-')}</td>
+        <td>{row.get('Site ID','-')}</td>
+        <td>{row.get('Site Name','-')}</td>
+        <td>{row.get('Cluster','-')}</td>
+        <td>{row.get('PO Number','-')}</td>
+        <td>₹{p_amt:,.2f}</td>
+        <td>{row.get('Team Name','-')}</td>
+        <td>{row.get('Site Status','-')}</td>
+        <td>₹{t_bill:,.2f}</td>
+        <td>₹{t_paid:,.2f}</td>
+        <td style="color:red; font-weight:bold;">₹{t_bal:,.2f}</td>
+        <td>{row.get('VIS Invoice No.','-')}</td>
+        <td>{row.get('VIS Invoice Date','-')}</td>
+        <td>₹{v_bill:,.2f}</td>
+        <td>₹{v_rec:,.2f}</td>
+        <td style="color:orange; font-weight:bold;">₹{v_bal:,.2f}</td>
+    </tr>
+    """
 
         full_html_code = f"""
         <html>
