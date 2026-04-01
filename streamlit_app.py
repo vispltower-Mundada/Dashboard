@@ -94,7 +94,7 @@ if menu == "📊 Dashboard":
     else:
         st.info("No data found in the database.")
 
-# ================= 📁 PROJECT MANAGEMENT (TRUE HORIZONTAL TABLE) =================
+# ================= 📁 PROJECT MANAGEMENT (LAVISH TABLE FIX) =================
 elif menu == "📁 Project Management":
     st.title("📁 Project Management Portal")
 
@@ -102,15 +102,15 @@ elif menu == "📁 Project Management":
     if "edit_id" not in st.session_state: st.session_state.edit_id = None
     if "show_form" not in st.session_state: st.session_state.show_form = False
 
-    # --- TOOLBAR (Add, Upload, Download, Search) ---
+    # --- TOOLBAR ---
     t1, t2, t3, t4 = st.columns([1, 1.2, 1, 3])
     with t1:
-        if st.button("➕ Add New", use_container_width=True, type="primary"):
+        if st.button("➕ Add New Site", use_container_width=True, type="primary"):
             st.session_state.show_form = True
             st.session_state.edit_id = None
             st.rerun()
     with t2:
-        bulk = st.file_uploader("Bulk Upload", type=['xlsx'], label_visibility="collapsed")
+        bulk = st.file_uploader("Bulk", type=['xlsx'], label_visibility="collapsed")
     
     df_m = pd.DataFrame(fetch_table("indus_data"))
     
@@ -119,51 +119,12 @@ elif menu == "📁 Project Management":
             out = BytesIO()
             with pd.ExcelWriter(out, engine='xlsxwriter') as wr:
                 df_m.to_excel(wr, index=False)
-            st.download_button("📥 Download Excel", out.getvalue(), "Vision_Master.xlsx", use_container_width=True)
+            st.download_button("📥 Download", out.getvalue(), "Vision_Master.xlsx", use_container_width=True)
     with t4:
-        search = st.text_input("", placeholder="🔍 Search anything...", label_visibility="collapsed")
+        search = st.text_input("", placeholder="🔍 Search...", label_visibility="collapsed")
 
-    # --- CSS FOR REAL HORIZONTAL SCROLL ---
-    st.markdown("""
-        <style>
-        .table-wrapper {
-            width: 100%;
-            overflow-x: auto; /* This enables the horizontal scroll */
-            border: 1px solid #e6e9ef;
-            border-radius: 10px;
-        }
-        .modern-table {
-            width: 100%;
-            border-collapse: collapse;
-            min-width: 2800px; /* Forces the table to stay wide */
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-        }
-        .modern-table th {
-            background-color: #1E60D5;
-            color: white;
-            padding: 15px;
-            text-align: left;
-            position: sticky;
-            top: 0;
-            z-index: 10;
-        }
-        .modern-table td {
-            padding: 12px;
-            border-bottom: 1px solid #f0f2f6;
-            font-size: 14px;
-            color: #31333F;
-        }
-        .modern-table tr:hover { background-color: #f8f9fb; }
-        .btn-link {
-            text-decoration: none;
-            color: #1E60D5;
-            font-weight: bold;
-            cursor: pointer;
-        }
-        </style>
-    """, unsafe_allow_html=True)
+    # [Note: Form code remains same as before here]
 
-    # --- TABLE LOGIC ---
     if not df_m.empty:
         # Search filter
         df_f = df_m[df_m.astype(str).apply(lambda x: x.str.contains(search, case=False)).any(axis=1)] if search else df_m
@@ -172,43 +133,34 @@ elif menu == "📁 Project Management":
         pg_size = 5
         tot_pgs = max(1, (len(df_f) // pg_size) + (1 if len(df_f) % pg_size > 0 else 0))
         curr_pg = st.number_input("Page", 1, tot_pgs, 1)
+        
+        # --- THE TRUE TABLE HTML ---
+        # CSS to ensure no text leaks out
+        table_css = """
+        <style>
+            .scroll-wrapper { width: 100%; overflow-x: auto; border-radius: 10px; border: 1px solid #ddd; }
+            .vision-table { width: 100%; border-collapse: collapse; min-width: 2500px; font-family: sans-serif; }
+            .vision-table th { background-color: #1E60D5; color: white; padding: 12px; text-align: left; position: sticky; top: 0; }
+            .vision-table td { padding: 12px; border-bottom: 1px solid #eee; font-size: 13px; background: white; }
+            .vision-table tr:hover { background-color: #f1f5f9; }
+        </style>
+        """
 
-        # Start Table HTML
-        html_table = f"""
-        <div class="table-wrapper">
-            <table class="modern-table">
+        header_html = """
+        <div class="scroll-wrapper">
+            <table class="vision-table">
                 <tr>
-                    <th>Actions</th>
-                    <th>Project ID</th>
-                    <th>Project</th>
-                    <th>Site ID</th>
-                    <th>Site Name</th>
-                    <th>Cluster</th>
-                    <th>PO Number</th>
-                    <th>Projected Amt</th>
-                    <th>Team Name</th>
-                    <th>Status</th>
-                    <th>Team Billing</th>
-                    <th>Team Paid</th>
-                    <th>Team Balance</th>
-                    <th>VIS Inv No</th>
-                    <th>VIS Inv Date</th>
-                    <th>VIS Bill Amt</th>
-                    <th>VIS Rec Amt</th>
-                    <th>VIS Balance</th>
+                    <th>Project ID</th><th>Project</th><th>Site ID</th><th>Site Name</th>
+                    <th>Cluster</th><th>PO Number</th><th>Projected Amt</th><th>Team Name</th>
+                    <th>Status</th><th>Team Billing</th><th>Team Paid</th><th>Team Bal</th>
+                    <th>VIS Inv No</th><th>VIS Inv Date</th><th>VIS Bill Amt</th><th>VIS Rec Amt</th><th>VIS Balance</th>
                 </tr>
         """
 
-        # Fill Table Rows
+        body_html = ""
         for i, row in df_f.iloc[(curr_pg-1)*pg_size : curr_pg*pg_size].iterrows():
-            rid = row.get('id', i)
-            html_table += f"""
+            body_html += f"""
                 <tr>
-                    <td>
-                        <a href="?edit={rid}">✏️</a> | 
-                        <a href="?pay={rid}">💰</a> | 
-                        <a href="?del={rid}">🗑️</a>
-                    </td>
                     <td><b>{row.get('Project ID','-')}</b></td>
                     <td>{row.get('Project','-')}</td>
                     <td>{row.get('Site ID','-')}</td>
@@ -229,29 +181,29 @@ elif menu == "📁 Project Management":
                 </tr>
             """
         
-        html_table += "</table></div>"
-        st.markdown(html_table, unsafe_allow_html=True)
-
-        # --- FOOTER ACTIONS ---
-        # Since HTML links inside Markdown can't trigger Python functions easily, 
-        # we keep a small button set here for the actual logic.
-        st.write("---")
-        action_col = st.columns([2, 2, 2, 4])
-        target_id = action_col[0].selectbox("Select ID to Edit/Delete", df_f['Project ID'].iloc[(curr_pg-1)*pg_size : curr_pg*pg_size])
+        full_html = table_css + header_html + body_html + "</table></div>"
         
-        if action_col[1].button("✏️ Edit Selected"):
+        # Use a single markdown call to prevent text leaking
+        st.markdown(full_html, unsafe_allow_html=True)
+
+        # --- ACTION BUTTONS (Below the table for safety) ---
+        st.write("---")
+        footer_col = st.columns([3, 2, 2, 3])
+        target_id = footer_col[0].selectbox("Select Site to Edit/Delete", df_f['Project ID'].iloc[(curr_pg-1)*pg_size : curr_pg*pg_size])
+        
+        if footer_col[1].button("✏️ Edit Site", use_container_width=True):
             target_row = df_f[df_f['Project ID'] == target_id].iloc[0]
             st.session_state.edit_id = target_row['id']
             st.session_state.show_form = True
             st.rerun()
-            
-        if action_col[2].button("🗑️ Delete Selected"):
+
+        if footer_col[2].button("🗑️ Delete Site", use_container_width=True):
             target_row = df_f[df_f['Project ID'] == target_id].iloc[0]
             delete_row("indus_data", target_row['id'])
             st.rerun()
 
     else:
-        st.info("No data available. Click 'Add New' to start.")
+        st.info("Database empty.")
 # ================= 💰 FINANCE (UNCHANGED) =================
 elif menu == "💰 Finance":
     st.title("💰 Finance Entry")
