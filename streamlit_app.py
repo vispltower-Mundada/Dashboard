@@ -1,114 +1,19 @@
-import streamlit as st
-import pandas as pd
-from supabase import create_client
-from io import BytesIO
-
-# ================= CONFIG (STRICT) =================
-SUPABASE_URL = "https://gmqjnokfatlevpmijcby.supabase.co"
-SUPABASE_KEY = "sb_publishable_Vb9b93LMMhipMEgLiRsrNw_fmZH5OFS"
-supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
-
-st.set_page_config(page_title="Vision Dashboard", layout="wide")
-
-# ================= CSS (DASHBOARD COLORS) =================
-st.markdown("""
-    <style>
-    .card { padding: 20px; border-radius: 10px; color: white; margin-bottom: 10px; height: 120px; display: flex; flex-direction: column; justify-content: center; }
-    .blue-card { background-color: #1E60D5; } .green-card { background-color: #00B65E; }
-    .purple-card { background-color: #9C27B0; } .orange-card { background-color: #FF6D00; }
-    .red-card { background-color: #D32F2F; } .teal-card { background-color: #009688; }
-    .light-blue-card { background-color: #00ACC1; } .dark-orange-card { background-color: #EF6C00; }
-    .cash-hand-card { background-color: #7E57C2; height: 150px !important; margin-top: 10px; }
-    .card-title { font-size: 14px; opacity: 0.9; margin-bottom: 5px; }
-    .card-value { font-size: 24px; font-weight: bold; }
-    </style>
-""", unsafe_allow_html=True)
-
-# ================= FUNCTIONS =================
-def fetch_table(table_name):
-    try:
-        res = supabase.table(table_name).select("*").execute()
-        return res.data
-    except: return []
-
-def insert_row(table_name, data):
-    return supabase.table(table_name).insert(data).execute()
-
-def update_row(table_name, row_id, data):
-    return supabase.table(table_name).update(data).eq("id", row_id).execute()
-
-def delete_row(table_name, row_id):
-    return supabase.table(table_name).delete().eq("id", row_id).execute()
-
-# ================= UI MENU =================
-menu = st.sidebar.radio("Menu", ["📊 Dashboard", "📁 Project Management", "💰 Finance"])
-
-# ================= 📊 DASHBOARD (STRICT LOGIC & FIXED) =================
-if menu == "📊 Dashboard":
-    st.title("📊 Dashboard")
-    st.caption("Overview of your site metrics")
-    
-    raw_data = fetch_table("indus_data")
-    data = pd.DataFrame(raw_data)
-    
-    # Yahan dhyan dein: 'if' ke niche ki saari lines 4-spaces aage hain
-    if not data.empty:
-        # 1. Sabse pehle column names ko clean karein (Extra spaces hatane ke liye)
-        data.columns = [c.strip() for c in data.columns]
-        
-        # 2. Numeric columns ko identify karein aur empty cells mein 0 bharein
-        numeric_cols = data.select_dtypes(include=['number']).columns
-        data[numeric_cols] = data[numeric_cols].fillna(0)
-        
-        # 3. Baaki columns (Text) ko empty string se bhar dein
-        data = data.fillna("") 
-        
-        # 4. Calculations (Strictly as before)
-        total_proj = pd.to_numeric(data['Project Amount'], errors='coerce').sum()
-        total_invested = 1500000.00 
-        total_team_bill = pd.to_numeric(data['Team Billing'], errors='coerce').sum()
-        total_team_paid = pd.to_numeric(data['Team Paid Amt'], errors='coerce').sum()
-        total_team_bal = pd.to_numeric(data['Team Balance'], errors='coerce').sum()
-        total_vis_bill = pd.to_numeric(data['VIS Inv Amt'], errors='coerce').sum()
-        total_vis_rec = pd.to_numeric(data['VIS Rec Amt'], errors='coerce').sum()
-        total_vis_bal = pd.to_numeric(data['VIS Balance'], errors='coerce').sum()
-        cash_in_hand = total_vis_rec - total_team_paid
-
-        # --- Dashboard Rows (UI logic strictly the same) ---
-        r1c1, r1c2 = st.columns(2)
-        r1c1.markdown(f'<div class="card blue-card"><div class="card-title">Total Projected Amount</div><div class="card-value">₹{total_proj:,.2f}</div></div>', unsafe_allow_html=True)
-        r1c2.markdown(f'<div class="card green-card"><div class="card-title">Total Invested Amount</div><div class="card-value">₹{total_invested:,.2f}</div></div>', unsafe_allow_html=True)
-
-        r2c1, r2c2, r2c3 = st.columns(3)
-        r2c1.markdown(f'<div class="card purple-card"><div class="card-title">Total Team Billing</div><div class="card-value">₹{total_team_bill:,.2f}</div></div>', unsafe_allow_html=True)
-        r2c2.markdown(f'<div class="card orange-card"><div class="card-title">Total Team Paid</div><div class="card-value">₹{total_team_paid:,.2f}</div></div>', unsafe_allow_html=True)
-        r2c3.markdown(f'<div class="card red-card"><div class="card-title">Total Team Balance</div><div class="card-value">₹{total_team_bal:,.2f}</div></div>', unsafe_allow_html=True)
-
-        r3c1, r3c2, r3c3 = st.columns(3)
-        r3c1.markdown(f'<div class="card teal-card"><div class="card-title">Total VIS Billing</div><div class="card-value">₹{total_vis_bill:,.2f}</div></div>', unsafe_allow_html=True)
-        r3c2.markdown(f'<div class="card light-blue-card"><div class="card-title">Total VIS Received</div><div class="card-value">₹{total_vis_rec:,.2f}</div></div>', unsafe_allow_html=True)
-        r3c3.markdown(f'<div class="card dark-orange-card"><div class="card-title">Total VIS Balance</div><div class="card-value">₹{total_vis_bal:,.2f}</div></div>', unsafe_allow_html=True)
-
-        st.markdown(f'<div class="card cash-hand-card"><div class="card-title">💵 Cash in Hand</div><div style="font-size: 40px; font-weight: bold;">₹{cash_in_hand:,.2f}</div></div>', unsafe_allow_html=True)
-    
-    else:
-        st.info("No data found in the database.")
-
 # ================= 📁 PROJECT MANAGEMENT (ORIGINAL LOGIC + PERFECT SCROLLER) =================
 elif menu == "📁 Project Management":
     st.title("📁 Project Master List")
 
     # --- 1. HANDLE ACTION CLICKS (URL QUERY PARAMS) ---
-    # Jab HTML table ke icons click honge, toh ye block original form ko trigger karega
     if "edit_id" in st.query_params:
         st.session_state.edit_id = int(st.query_params["edit_id"])
         st.session_state.show_form = True
         st.query_params.clear()
+        st.query_params["menu"] = "Project"
         st.rerun()
 
     if "del_id" in st.query_params:
         delete_row("indus_data", int(st.query_params["del_id"]))
         st.query_params.clear()
+        st.query_params["menu"] = "Project"
         st.rerun()
 
     if "edit_id" not in st.session_state: st.session_state.edit_id = None
@@ -192,7 +97,6 @@ elif menu == "📁 Project Management":
             try: return f"₹{float(val):,.2f}" if not pd.isna(val) else "₹0.00"
             except: return "₹0.00"
 
-        # Constructing HTML. We use single string to prevent Streamlit Markdown breaks.
         html_code = """
         <style>
         .scroll-container { width: 100%; overflow-x: auto; border-radius: 10px; border: 1px solid #ddd; background: white; margin-top: 15px; box-shadow: 0 4px 10px rgba(0,0,0,0.05); }
@@ -223,9 +127,9 @@ elif menu == "📁 Project Management":
             html_code += f"""
                 <tr>
                     <td class="sticky-action">
-                        <a href="?edit_id={db_id}" target="_self" class="btn-icon">✏️</a>
-                        <a href="?pay_id={p_id}" target="_self" class="btn-icon">💰</a>
-                        <a href="?del_id={db_id}" target="_self" class="btn-icon">🗑️</a>
+                        <a href="?menu=Project&edit_id={db_id}" target="_parent" class="btn-icon">✏️</a>
+                        <a href="?menu=Project&pay_id={p_id}" target="_parent" class="btn-icon">💰</a>
+                        <a href="?menu=Project&del_id={db_id}" target="_parent" class="btn-icon">🗑️</a>
                     </td>
                     <td style="font-weight:bold; color:#1E60D5;">{p_id}</td>
                     <td>{row.get('Project','-')}</td>
@@ -247,12 +151,8 @@ elif menu == "📁 Project Management":
         
         html_code += "</table></div>"
         
-        # KEY FIX: .replace("\n", "") prevents Streamlit from breaking HTML and showing raw text
+        # KEY FIX: .replace("\n", "") prevents Streamlit from breaking HTML
         st.markdown(html_code.replace('\n', ''), unsafe_allow_html=True)
 
     else:
         st.info("No projects found.")
-# ================= 💰 FINANCE (UNCHANGED) =================
-elif menu == "💰 Finance":
-    st.title("💰 Finance Entry")
-    # Finance logic as per your database
