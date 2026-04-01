@@ -94,57 +94,59 @@ if menu == "📊 Dashboard":
     else:
         st.info("No data found in the database.")
 
-# ================= 📁 PROJECT MANAGEMENT (FULL HORIZONTAL TABLE) =================
+# ================= 📁 PROJECT MANAGEMENT (FULL 17-COLUMN TABLE) =================
 elif menu == "📁 Project Management":
     st.title("📁 Project Master List")
 
-    # Session states
+    # Session states for Edit/Add
     if "edit_id" not in st.session_state: st.session_state.edit_id = None
     if "show_form" not in st.session_state: st.session_state.show_form = False
 
-    # --- CSS FOR REAL HORIZONTAL TABLE ---
+    # --- CSS FOR LAVISH HORIZONTAL SCROLL & TOOLBAR ---
     st.markdown("""
         <style>
-        .main-table-container {
+        /* Container for Horizontal Scroll */
+        .full-table-wrapper {
             overflow-x: auto;
-            background-color: white;
+            background-color: #ffffff;
             border-radius: 12px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
-            padding: 10px;
+            padding: 15px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+            margin-top: 20px;
         }
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            min-width: 1500px; /* Force horizontal scroll */
-        }
-        th {
+        /* Sticky Headers & Data Formatting */
+        .header-row {
+            display: flex;
             background-color: #1E60D5;
             color: white;
-            text-align: left;
-            padding: 12px;
-            position: sticky;
-            top: 0;
-        }
-        td {
-            padding: 10px;
-            border-bottom: 1px solid #eee;
-            font-size: 13px;
-        }
-        tr:hover { background-color: #f1f5f9; }
-        .action-btns { display: flex; gap: 5px; }
-        .status-pill {
-            padding: 4px 10px;
-            border-radius: 20px;
-            font-size: 11px;
             font-weight: bold;
+            padding: 12px 5px;
+            border-radius: 8px 8px 0 0;
+            min-width: 2500px; /* Force extreme horizontal scroll for 17 columns */
         }
+        .data-row {
+            display: flex;
+            padding: 10px 5px;
+            border-bottom: 1px solid #eee;
+            align-items: center;
+            min-width: 2500px;
+        }
+        .cell { padding: 0 10px; flex-shrink: 0; overflow: hidden; text-overflow: ellipsis; }
+        
+        /* Column Width Definitions */
+        .w-btn { width: 50px; }
+        .w-id { width: 180px; }
+        .w-text { width: 150px; }
+        .w-amt { width: 130px; }
+        .w-status { width: 120px; }
         </style>
     """, unsafe_allow_html=True)
 
-    # --- TOOLBAR ---
-    t1, t2, t3, t4 = st.columns([1, 1, 1, 3])
+    # --- TOP TOOLBAR (LEFT ALIGNED) ---
+    t1, t2, t3, t4 = st.columns([1, 1.2, 1, 3])
+    
     with t1:
-        if st.button("➕ Add New Site", use_container_width=True):
+        if st.button("➕ Add New", use_container_width=True, type="primary"):
             st.session_state.show_form = True
             st.session_state.edit_id = None
             st.rerun()
@@ -158,109 +160,137 @@ elif menu == "📁 Project Management":
             out = BytesIO()
             with pd.ExcelWriter(out, engine='xlsxwriter') as wr:
                 df_master.to_excel(wr, index=False)
-            st.download_button("📥 Download All", out.getvalue(), "Project_Report.xlsx", use_container_width=True)
+            st.download_button("📥 Download", out.getvalue(), "Vision_Master_Report.xlsx", use_container_width=True)
     with t4:
-        search = st.text_input("", placeholder="🔍 Search by Project ID, Site Name, or Team...", label_visibility="collapsed")
+        search = st.text_input("", placeholder="🔍 Search by Project, ID, Site or Team...", label_visibility="collapsed")
 
     # --- FORM (ADD / EDIT) ---
     if st.session_state.show_form:
-        with st.expander("📝 Enter Details", expanded=True):
-            with st.form("main_entry_form"):
-                ed = None
-                if st.session_state.edit_id and not df_master.empty:
-                    ed_query = df_master[df_master['id'] == st.session_state.edit_id]
-                    if not ed_query.empty: ed = ed_query.iloc[0]
-                
-                c1, c2, c3, c4 = st.columns(4)
-                # Group 1
-                p_name = c1.text_input("Project Name", value=ed['Project'] if ed is not None else "")
-                p_id = c1.text_input("Project ID", value=ed['Project ID'] if ed is not None else "")
-                s_id = c1.text_input("Site ID", value=ed['Site ID'] if ed is not None else "")
-                # Group 2
-                s_name = c2.text_input("Site Name", value=ed['Site Name'] if ed is not None else "")
-                cluster = c2.text_input("Cluster", value=ed['Cluster'] if ed is not None else "")
-                po_no = c2.text_input("PO Number", value=ed['PO Number'] if ed is not None else "")
-                # Group 3
-                t_name = c3.selectbox("Team", ["Team A", "Team B", "Team C", "Team D"], index=0)
-                s_status = c3.selectbox("Status", ["Pending", "Ongoing", "Completed"])
-                p_amt = c3.number_input("Project Amt", value=float(ed['Project Amount']) if ed is not None else 0.0)
-                # Group 4
-                t_bill = c4.number_input("Team Billing", value=float(ed['Team Billing']) if ed is not None else 0.0)
-                v_inv = c4.number_input("VIS Inv Amt", value=float(ed['VIS Inv Amt']) if ed is not None else 0.0)
-                v_rec = c4.number_input("VIS Rec Amt", value=float(ed['VIS Rec Amt']) if ed is not None else 0.0)
+        st.divider()
+        with st.form("site_entry_form"):
+            st.subheader("📝 Project Entry / Edit")
+            ed = None
+            if st.session_state.edit_id and not df_master.empty:
+                ed_q = df_master[df_master['id'] == st.session_state.edit_id]
+                if not ed_q.empty: ed = ed_q.iloc[0]
+            
+            c1, c2, c3, c4 = st.columns(4)
+            # Row 1
+            proj_type = c1.selectbox("Project", ["Airtel", "Jio", "VIL", "O&M"], index=0)
+            proj_id = c2.text_input("Project ID (Unique)", value=ed['Project ID'] if ed is not None else "")
+            site_id = c3.text_input("Site ID", value=ed['Site ID'] if ed is not None else "")
+            site_name = c4.text_input("Site Name", value=ed['Site Name'] if ed is not None else "")
+            
+            # Row 2
+            cluster = c1.text_input("Cluster", value=ed['Cluster'] if ed is not None else "")
+            po_no = c2.text_input("PO Number", value=ed['PO Number'] if ed is not None else "")
+            p_amt = c3.number_input("Projected Amount", value=float(ed['Projected Amount']) if ed is not None else 0.0)
+            t_name = c4.selectbox("Team Name", ["Team A", "Team B", "Team C"], index=0)
+            
+            # Row 3
+            s_status = c1.selectbox("Site Status", ["Pending", "Ongoing", "Completed"])
+            t_bill = c2.number_input("Team Billing", value=float(ed['Team Billing']) if ed is not None else 0.0)
+            t_paid = c3.number_input("Team Paid Amount", value=float(ed['Team paid Amount']) if ed is not None else 0.0)
+            v_inv_no = c4.text_input("VIS Invoice No.", value=ed['VIS Invoice No.'] if ed is not None else "")
+            
+            # Row 4
+            v_inv_date = c1.date_input("VIS Invoice Date")
+            v_bill_amt = c2.number_input("VIS Bill Amount", value=float(ed['VIS Bill Amount']) if ed is not None else 0.0)
+            v_rec_amt = c3.number_input("VIS Received Amt", value=float(ed['VIS Received Amt']) if ed is not None else 0.0)
 
-                if st.form_submit_button("💾 Save Project Data"):
-                    payload = {
-                        "Project": p_name, "Project ID": p_id, "Site ID": s_id, "Site Name": s_name,
-                        "Cluster": cluster, "PO Number": po_no, "Project Amount": p_amt,
-                        "Team Name": t_name, "Site Status": s_status, "Team Billing": t_bill,
-                        "Team Paid Amt": ed['Team Paid Amt'] if ed is not None else 0.0,
-                        "Team Balance": t_bill - (ed['Team Paid Amt'] if ed is not None else 0.0),
-                        "VIS Inv Amt": v_inv, "VIS Rec Amt": v_rec, "VIS Balance": v_inv - v_rec,
-                        "Profit": v_inv - t_bill
-                    }
-                    if st.session_state.edit_id:
-                        update_row("indus_data", st.session_state.edit_id, payload)
-                    else:
-                        insert_row("indus_data", payload)
-                    st.session_state.show_form = False
-                    st.rerun()
+            if st.form_submit_button("💾 Save to Database"):
+                payload = {
+                    "Project": proj_type, "Project ID": proj_id, "Site ID": site_id, "Site Name": site_name,
+                    "Cluster": cluster, "PO Number": po_no, "Projected Amount": p_amt, "Team Name": t_name,
+                    "Site Status": s_status, "Team Billing": t_bill, "Team paid Amount": t_paid,
+                    "Team Balance": t_bill - t_paid, "VIS Invoice No.": v_inv_no, "VIS Invoice Date": str(v_inv_date),
+                    "VIS Bill Amount": v_bill_amt, "VIS Received Amt": v_rec_amt,
+                    "VIS Balance": v_bill_amt - v_rec_amt, "Profit": v_bill_amt - t_bill
+                }
+                if st.session_state.edit_id:
+                    update_row("indus_data", st.session_state.edit_id, payload)
+                else:
+                    insert_row("indus_data", payload)
+                st.session_state.show_form = False
+                st.rerun()
 
-    # --- THE PROFESSIONAL TABLE ---
+    # --- THE 17-COLUMN LAVISH TABLE ---
     if not df_master.empty:
         if search:
             df_display = df_master[df_master.astype(str).apply(lambda x: x.str.contains(search, case=False)).any(axis=1)]
         else:
             df_display = df_master
 
-        # Pagination logic
+        # Pagination (5 Rows)
         p_size = 5
-        total_rows = len(df_display)
-        if total_rows > 0:
-            total_p = (total_rows // p_size) + (1 if total_rows % p_size > 0 else 0)
-            curr_p = st.number_input("Page", 1, total_p, 1) if total_p > 1 else 1
-            
-            start = (curr_p - 1) * p_size
-            end = start + p_size
+        total_p = max(1, (len(df_display) // p_size) + (1 if len(df_display) % p_size > 0 else 0))
+        curr_p = st.number_input("Page", 1, total_p, 1)
+        start, end = (curr_p - 1) * p_size, curr_p * p_size
 
-            # Table UI
-            st.markdown('<div class="main-table-container"><table>'
-                '<tr>'
-                '<th>Actions</th><th>Project ID</th><th>Project</th><th>Site Name</th>'
-                '<th>Team</th><th>Status</th><th>Team Bill</th><th>Team Bal</th>'
-                '<th>VIS Inv</th><th>VIS Rec</th><th>Profit</th>'
-                '</tr>', unsafe_allow_html=True)
+        st.markdown('<div class="full-table-wrapper">', unsafe_allow_html=True)
+        
+        # Header Row (All 17 logic columns)
+        st.markdown(f"""
+            <div class="header-row">
+                <div class="cell w-btn">Edit</div>
+                <div class="cell w-btn">Pay</div>
+                <div class="cell w-btn">Del</div>
+                <div class="cell w-id">Project ID</div>
+                <div class="cell w-text">Project</div>
+                <div class="cell w-text">Site ID</div>
+                <div class="cell w-text">Site Name</div>
+                <div class="cell w-text">Cluster</div>
+                <div class="cell w-text">PO Number</div>
+                <div class="cell w-amt">Projected Amt</div>
+                <div class="cell w-text">Team Name</div>
+                <div class="cell w-status">Status</div>
+                <div class="cell w-amt">Team Billing</div>
+                <div class="cell w-amt">Team Paid</div>
+                <div class="cell w-amt">Team Balance</div>
+                <div class="cell w-text">VIS Inv No</div>
+                <div class="cell w-amt">VIS Bill Amt</div>
+                <div class="cell w-amt">VIS Rec Amt</div>
+                <div class="cell w-amt">VIS Balance</div>
+            </div>
+        """, unsafe_allow_html=True)
 
-            for i, row in df_display.iloc[start:end].iterrows():
-                rid = row.get('id', i)
-                # Buttons logic inside columns for Streamlit compatibility
-                col_act = st.columns([0.8, 1, 1.5, 1.5, 1, 1, 1, 1, 1, 1, 1])
-                
-                # We use standard Streamlit columns for buttons but custom HTML for data
-                with st.container():
-                    b1, b2, b3, d1, d2, d3, d4, d5, d6, d7, d8 = st.columns([0.15, 0.15, 0.15, 0.5, 0.8, 0.8, 0.5, 0.5, 0.5, 0.5, 0.5])
-                    if b1.button("✏️", key=f"e_{rid}"):
-                        st.session_state.edit_id = rid
-                        st.session_state.show_form = True
-                        st.rerun()
-                    if b2.button("💰", key=f"p_{rid}"): st.toast("Opening Finance...")
-                    if b3.button("🗑️", key=f"d_{rid}"):
-                        delete_row("indus_data", rid)
-                        st.rerun()
-                    
-                    d1.write(row['Project ID'])
-                    d2.write(row['Project'])
-                    d3.write(row['Site Name'])
-                    d4.write(row['Team Name'])
-                    d5.write(row['Site Status'])
-                    d6.write(f"₹{row['Team Billing']}")
-                    d7.write(f"₹{row['Team Balance']}")
-                    d8.write(f"₹{row['Profit']}")
-                    st.markdown("---")
-        else:
-            st.warning("Search query matches no results.")
-    else:
-        st.info("No data in table.")
+        for i, row in df_display.iloc[start:end].iterrows():
+            rid = row.get('id', i)
+            # Action Buttons Layout
+            btn_col = st.columns([0.1, 0.1, 0.1, 8])
+            if btn_col[0].button("✏️", key=f"e_{rid}"):
+                st.session_state.edit_id = rid
+                st.session_state.show_form = True
+                st.rerun()
+            if btn_col[1].button("💰", key=f"p_{rid}"): st.toast("Opening Finance...")
+            if btn_col[2].button("🗑️", key=f"d_{rid}"):
+                delete_row("indus_data", rid)
+                st.rerun()
+
+            # The Data Row
+            st.markdown(f"""
+                <div class="data-row">
+                    <div class="cell w-btn"></div><div class="cell w-btn"></div><div class="cell w-btn"></div>
+                    <div class="cell w-id"><b>{row['Project ID']}</b></div>
+                    <div class="cell w-text">{row['Project']}</div>
+                    <div class="cell w-text">{row['Site ID']}</div>
+                    <div class="cell w-text">{row['Site Name']}</div>
+                    <div class="cell w-text">{row['Cluster']}</div>
+                    <div class="cell w-text">{row['PO Number']}</div>
+                    <div class="cell w-amt">₹{row['Projected Amount']}</div>
+                    <div class="cell w-text">{row['Team Name']}</div>
+                    <div class="cell w-status">{row['Site Status']}</div>
+                    <div class="cell w-amt">₹{row['Team Billing']}</div>
+                    <div class="cell w-amt">₹{row['Team paid Amount']}</div>
+                    <div class="cell w-amt" style="color:red">₹{row['Team Balance']}</div>
+                    <div class="cell w-text">{row['VIS Invoice No.']}</div>
+                    <div class="cell w-amt">₹{row['VIS Bill Amount']}</div>
+                    <div class="cell w-amt">₹{row['VIS Received Amt']}</div>
+                    <div class="cell w-amt" style="color:orange">₹{row['VIS Balance']}</div>
+                </div>
+            """, unsafe_allow_html=True)
+        
+        st.markdown('</div>', unsafe_allow_html=True)
 # ================= 💰 FINANCE (UNCHANGED) =================
 elif menu == "💰 Finance":
     st.title("💰 Finance Entry")
