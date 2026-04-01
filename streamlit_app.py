@@ -112,43 +112,44 @@ elif menu == "📁 Project Management":
             st.markdown("### 📍 1. Site Details")
             c1, c2, c3 = st.columns(3)
             p_opts = ["Airtel", "Jio", "VIL", "O&M"]
-            p_val = str(ed.get('Project', 'Airtel')) if ed else "Airtel"
+            p_val = str(ed.get('Project', 'Airtel')) if ed is not None else "Airtel"
             p_type = c1.selectbox("Project", p_opts, index=p_opts.index(p_val) if p_val in p_opts else 0)
-            p_id = c2.text_input("Project ID (Must be Unique) *", value=str(ed.get('Project ID', '')) if ed else "")
-            s_id = c3.text_input("Site ID", value=str(ed.get('Site ID', '')) if ed else "")
+            
+            p_id = c2.text_input("Project ID (Must be Unique) *", value=str(ed.get('Project ID', '')) if ed is not None else "")
+            s_id = c3.text_input("Site ID", value=str(ed.get('Site ID', '')) if ed is not None else "")
             
             c4, c5, c6 = st.columns(3)
-            s_name = c4.text_input("Site Name", value=str(ed.get('Site Name', '')) if ed else "")
-            clstr = c5.text_input("Cluster", value=str(ed.get('Cluster', '')) if ed else "")
-            po = c6.text_input("PO Number", value=str(ed.get('PO Number', '')) if ed else "")
+            s_name = c4.text_input("Site Name", value=str(ed.get('Site Name', '')) if ed is not None else "")
+            clstr = c5.text_input("Cluster", value=str(ed.get('Cluster', '')) if ed is not None else "")
+            po = c6.text_input("PO Number", value=str(ed.get('PO Number', '')) if ed is not None else "")
             
-            p_amt = st.number_input("Projected Amount", value=float(ed.get('Projected Amount', 0)) if ed else 0.0)
+            p_amt = st.number_input("Projected Amount", value=float(ed.get('Projected Amount', 0)) if ed is not None else 0.0)
 
             # ---------------- STEP 2: TEAM DETAILS ----------------
             st.markdown("### 👥 2. Team Details")
             c7, c8 = st.columns(2)
             t_opts = ["Team A", "Team B", "Team C", "Team D"]
-            t_val = str(ed.get('Team Name', 'Team A')) if ed else "Team A"
+            t_val = str(ed.get('Team Name', 'Team A')) if ed is not None else "Team A"
             t_name = c7.selectbox("Team Name", t_opts, index=t_opts.index(t_val) if t_val in t_opts else 0)
             
             sts_opts = ["Pending", "Ongoing", "Completed", "Done", "Yet to Start"]
-            sts_val = str(ed.get('Site Status', 'Pending')) if ed else "Pending"
+            sts_val = str(ed.get('Site Status', 'Pending')) if ed is not None else "Pending"
             sts = c8.selectbox("Site Status", sts_opts, index=sts_opts.index(sts_val) if sts_val in sts_opts else 0)
 
             c9, c10 = st.columns(2)
-            t_bill = c9.number_input("Team Billing", value=float(ed.get('Team Billing', 0)) if ed else 0.0)
-            t_paid = c10.number_input("Team Paid Amount", value=float(ed.get('Team paid Amount', 0)) if ed else 0.0)
+            t_bill = c9.number_input("Team Billing", value=float(ed.get('Team Billing', 0)) if ed is not None else 0.0)
+            t_paid = c10.number_input("Team Paid Amount", value=float(ed.get('Team paid Amount', 0)) if ed is not None else 0.0)
             st.info(f"**Team Balance (Auto-calculated):** ₹ {t_bill - t_paid:,.2f}")
 
             # ---------------- STEP 3: VIS BILLING DETAILS ----------------
             st.markdown("### 📄 3. VIS Billing Details")
             c11, c12 = st.columns(2)
-            v_no = c11.text_input("VIS Invoice No.", value=str(ed.get('VIS Invoice No.', '')) if ed else "")
-            v_date = c12.text_input("VIS Invoice Date", value=str(ed.get('VIS Invoice Date', '')) if ed else "")
+            v_no = c11.text_input("VIS Invoice No.", value=str(ed.get('VIS Invoice No.', '')) if ed is not None else "")
+            v_date = c12.text_input("VIS Invoice Date", value=str(ed.get('VIS Invoice Date', '')) if ed is not None else "")
 
             c13, c14 = st.columns(2)
-            v_amt = c13.number_input("VIS Bill Amount", value=float(ed.get('VIS Bill Amount', 0)) if ed else 0.0)
-            v_rec = c14.number_input("VIS Received Amt", value=float(ed.get('VIS Received Amt', 0)) if ed else 0.0)
+            v_amt = c13.number_input("VIS Bill Amount", value=float(ed.get('VIS Bill Amount', 0)) if ed is not None else 0.0)
+            v_rec = c14.number_input("VIS Received Amt", value=float(ed.get('VIS Received Amt', 0)) if ed is not None else 0.0)
             st.info(f"**VIS Balance (Auto-calculated):** ₹ {v_amt - v_rec:,.2f}")
 
             st.divider()
@@ -174,11 +175,10 @@ elif menu == "📁 Project Management":
 
     # --- 2. HANDLE URL PARAMS (TRIGGER POP-UPS) ---
     if "edit_id" in st.query_params:
-        rid = str(st.query_params["edit_id"]) # Int ki jagah String kiya taaki crash na ho
+        rid = str(st.query_params["edit_id"])
         st.query_params.clear()
         st.query_params["menu"] = "Project"
         
-        # Safe Row Finder Logic
         ed_row = pd.DataFrame()
         for idx, row in df_m.iterrows():
             db_id = str(row.get('id', row.get('ID', idx)))
@@ -187,14 +187,14 @@ elif menu == "📁 Project Management":
                 break
                 
         if not ed_row.empty:
-            project_form_modal(ed_row.iloc[0])
+            # FIX: Convert to dict to prevent Pandas Truth Value Error
+            project_form_modal(ed_row.iloc[0].to_dict())
 
     if "del_id" in st.query_params:
         rid = str(st.query_params["del_id"])
         st.query_params.clear()
         st.query_params["menu"] = "Project"
         
-        # Safe Delete Logic
         for idx, row in df_m.iterrows():
             db_id = str(row.get('id', row.get('ID', idx)))
             if db_id == rid:
@@ -226,7 +226,7 @@ elif menu == "📁 Project Management":
     with t4:
         search = st.text_input("", placeholder="🔍 Search Site, ID or Team...", label_visibility="collapsed")
 
-    # --- 4. LAVISH TABLE WITH SCROLLER (NO CODE LEAKS) ---
+    # --- 4. LAVISH TABLE WITH SCROLLER ---
     if not df_m.empty:
         df_f = df_m[df_m.astype(str).apply(lambda x: x.str.contains(search, case=False)).any(axis=1)] if search else df_m
         
@@ -239,7 +239,7 @@ elif menu == "📁 Project Management":
             except: return "₹0.00"
 
         html_code = """
-       <style>
+        <style>
         .scroll-container { 
             width: 100%; 
             overflow-x: auto; 
@@ -251,7 +251,6 @@ elif menu == "📁 Project Management":
             position: relative; 
             z-index: 10; 
         }
-        /* FIX 1: 'collapse' ki jagah 'separate' use karna zaroori hai sticky clicks ke liye */
         .data-table { 
             width: 100%; 
             border-collapse: separate; 
@@ -278,7 +277,6 @@ elif menu == "📁 Project Management":
         }
         .data-table tr:hover td { background: #f8f9fa; }
         
-        /* FIX 2: Actions column ko sabse upar laane ke liye Z-index 999 */
         .sticky-action { 
             position: sticky; 
             left: 0; 
@@ -296,7 +294,6 @@ elif menu == "📁 Project Management":
             text-align: center; 
         }
         
-        /* FIX 3: Buttons ko strictly clickable banane ke liye pointer-events aur high Z-index */
         .btn-icon { 
             text-decoration: none; 
             font-size: 18px; 
@@ -326,7 +323,6 @@ elif menu == "📁 Project Management":
             db_id = row.get('id') if row.get('id') else row.get('ID', i)
             p_id = row.get('Project ID', 'N/A')
             
-            # FIX 4: target="_self" taaki click Streamlit ke URL system se safely interact kare
             html_code += f"""
                 <tr>
                     <td class="sticky-action">
@@ -356,6 +352,9 @@ elif menu == "📁 Project Management":
         html_code += "</table></div>"
         
         st.markdown(html_code.replace('\n', ''), unsafe_allow_html=True)
+
+    else:
+        st.info("No projects found.")
         
 
 # ================= 3. 💰 FINANCE =================
