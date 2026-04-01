@@ -94,15 +94,14 @@ if menu == "📊 Dashboard":
     else:
         st.info("No data found in the database.")
 
-# ================= 📁 PROJECT MANAGEMENT (FIXED TABLE) =================
+# ================= 📁 PROJECT MANAGEMENT (STRICT TABLE COMPONENT) =================
 elif menu == "📁 Project Management":
     st.title("📁 Project Management Portal")
 
-    # Session states
     if "edit_id" not in st.session_state: st.session_state.edit_id = None
     if "show_form" not in st.session_state: st.session_state.show_form = False
 
-    # --- TOOLBAR ---
+    # --- TOP TOOLBAR ---
     t1, t2, t3, t4 = st.columns([1, 1.2, 1, 3])
     with t1:
         if st.button("➕ Add New Site", use_container_width=True, type="primary"):
@@ -121,11 +120,11 @@ elif menu == "📁 Project Management":
                 df_m.to_excel(wr, index=False)
             st.download_button("📥 Download", out.getvalue(), "Vision_Master.xlsx", use_container_width=True)
     with t4:
-        search = st.text_input("", placeholder="🔍 Search...", label_visibility="collapsed")
+        search = st.text_input("", placeholder="🔍 Search Site, ID or Team...", label_visibility="collapsed")
 
-    # --- THE TRUE TABLE HTML ---
+    # --- THE TRUE TABLE (Using HTML Component for 100% Reliability) ---
     if not df_m.empty:
-        # Search filter
+        # Filter
         df_f = df_m[df_m.astype(str).apply(lambda x: x.str.contains(search, case=False)).any(axis=1)] if search else df_m
         
         # Pagination
@@ -133,23 +132,10 @@ elif menu == "📁 Project Management":
         tot_pgs = max(1, (len(df_f) // pg_size) + (1 if len(df_f) % pg_size > 0 else 0))
         curr_pg = st.number_input("Page", 1, tot_pgs, 1)
         
-        # Constructing the HTML as a SINGLE STRING
-        table_html = [
-            '<style>',
-            '.scroll-wrapper { width: 100%; overflow-x: auto; border: 1px solid #ddd; border-radius: 10px; }',
-            '.vision-table { width: 100%; border-collapse: collapse; min-width: 2500px; font-family: sans-serif; }',
-            '.vision-table th { background-color: #1E60D5; color: white; padding: 12px; text-align: left; position: sticky; top: 0; }',
-            '.vision-table td { padding: 12px; border-bottom: 1px solid #eee; font-size: 13px; background: white; }',
-            '.vision-table tr:hover { background-color: #f1f5f9; }',
-            '</style>',
-            '<div class="scroll-wrapper">',
-            '<table class="vision-table">',
-            '<tr><th>Project ID</th><th>Project</th><th>Site ID</th><th>Site Name</th><th>Cluster</th><th>PO Number</th><th>Projected Amt</th><th>Team Name</th><th>Status</th><th>Team Billing</th><th>Team Paid</th><th>Team Bal</th><th>VIS Inv No</th><th>VIS Inv Date</th><th>VIS Bill Amt</th><th>VIS Rec Amt</th><th>VIS Balance</th></tr>'
-        ]
-
-        # Adding rows to the list
+        # Build HTML String
+        table_rows = ""
         for _, row in df_f.iloc[(curr_pg-1)*pg_size : curr_pg*pg_size].iterrows():
-            row_str = f"""
+            table_rows += f"""
             <tr>
                 <td><b>{row.get('Project ID','-')}</b></td>
                 <td>{row.get('Project','-')}</td>
@@ -170,31 +156,56 @@ elif menu == "📁 Project Management":
                 <td style="color:orange; font-weight:bold;">₹{row.get('VIS Balance',0):,.2f}</td>
             </tr>
             """
-            table_html.append(row_str)
-        
-        table_html.append("</table></div>")
-        
-        # Rendering EVERYTHING at once
-        st.write("---")
-        st.markdown("".join(table_html), unsafe_allow_html=True)
 
-        # --- FOOTER ACTIONS ---
-        st.write("---")
-        f_col1, f_col2, f_col3 = st.columns([4, 2, 2])
-        target_id = f_col1.selectbox("Select Project ID for Action", df_f['Project ID'].iloc[(curr_pg-1)*pg_size : curr_pg*pg_size])
+        full_html_code = f"""
+        <html>
+        <head>
+        <style>
+            .container {{ width: 100%; overflow-x: auto; font-family: sans-serif; }}
+            table {{ width: 100%; border-collapse: collapse; min-width: 2600px; border: 1px solid #ddd; }}
+            th {{ background-color: #1E60D5; color: white; padding: 12px; text-align: left; }}
+            td {{ padding: 12px; border-bottom: 1px solid #eee; font-size: 13px; background: white; }}
+            tr:hover {{ background-color: #f1f5f9; }}
+        </style>
+        </head>
+        <body>
+            <div class="container">
+                <table>
+                    <tr>
+                        <th>Project ID</th><th>Project</th><th>Site ID</th><th>Site Name</th>
+                        <th>Cluster</th><th>PO Number</th><th>Projected Amt</th><th>Team Name</th>
+                        <th>Status</th><th>Team Billing</th><th>Team Paid</th><th>Team Bal</th>
+                        <th>VIS Inv No</th><th>VIS Inv Date</th><th>VIS Bill Amt</th><th>VIS Rec Amt</th><th>VIS Balance</th>
+                    </tr>
+                    {table_rows}
+                </table>
+            </div>
+        </body>
+        </html>
+        """
         
-        if f_col2.button("✏️ Edit Selected", use_container_width=True):
+        # This component ensures NO CODE LEAKS as text
+        import streamlit.components.v1 as components
+        components.html(full_html_code, height=450, scrolling=True)
+
+        # --- ACTION SECTION ---
+        st.write("### ⚙️ Actions")
+        f1, f2, f3 = st.columns([4, 2, 2])
+        visible_ids = df_f['Project ID'].iloc[(curr_pg-1)*pg_size : curr_pg*pg_size].tolist()
+        target_id = f1.selectbox("Select ID for Edit/Delete", visible_ids)
+        
+        if f2.button("✏️ Edit Selected", use_container_width=True):
             target_row = df_f[df_f['Project ID'] == target_id].iloc[0]
             st.session_state.edit_id = target_row['id']
             st.session_state.show_form = True
             st.rerun()
 
-        if f_col3.button("🗑️ Delete Selected", use_container_width=True):
+        if f3.button("🗑️ Delete Selected", use_container_width=True):
             target_row = df_f[df_f['Project ID'] == target_id].iloc[0]
             delete_row("indus_data", target_row['id'])
             st.rerun()
     else:
-        st.info("No data available.")
+        st.info("No data found.")
 # ================= 💰 FINANCE (UNCHANGED) =================
 elif menu == "💰 Finance":
     st.title("💰 Finance Entry")
